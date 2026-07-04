@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 This project uses local release-candidate backups before new development begins. See [docs/versioning.md](docs/versioning.md) for the versioning and backup rules.
 
+## [v2.1.2] - 2026-07-04
+
+### Changed
+
+- Rebalanced stone size for desktop and mobile.
+- Slightly reduced desktop stones.
+- Slightly enlarged mobile stones.
+- Increased move sound feedback volume.
+
 ## [v2.1.1] - 2026-07-04
 
 ### Changed

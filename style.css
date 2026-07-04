@@ -354,7 +354,7 @@ h1 {
 .board {
   --board-padding: clamp(20px, 6%, 44px);
   --hit-size: clamp(24px, 5.2vmin, 44px);
-  --stone-size: clamp(17px, 4.15vmin, 36px);
+  --stone-size: clamp(16px, 3.75vmin, 32px);
   position: relative;
   isolation: isolate;
   width: 100%;
@@ -881,7 +881,7 @@ button:disabled {
   }
 
   .board {
-    --stone-size: clamp(25px, 3.6vmin, 29px);
+    --stone-size: clamp(24px, 3.45vmin, 28px);
   }
 
   .cell.is-last::after {
@@ -1111,7 +1111,7 @@ button:disabled {
   .board {
     --board-padding: clamp(16px, 5.4vw, 22px);
     --hit-size: clamp(30px, 8.5vw, 40px);
-    --stone-size: clamp(14px, 4vw, 16px);
+    --stone-size: clamp(15px, 4.45vw, 18px);
   }
 
   .grid-line.is-vertical {
@@ -1206,7 +1206,7 @@ button:disabled {
   .board {
     --board-padding: clamp(14px, 5vw, 19px);
     --hit-size: clamp(30px, 9vw, 34px);
-    --stone-size: clamp(13px, 3.8vw, 15px);
+    --stone-size: clamp(14px, 4.25vw, 16px);
   }
 
   .match-stat p,
@@ -1221,7 +1221,7 @@ button:disabled {
 
 @media (max-height: 560px) and (pointer: coarse) {
   .board {
-    --stone-size: clamp(10px, 2.8svh, 12px);
+    --stone-size: clamp(11px, 3svh, 13px);
   }
 
   .cell.is-last::after {
