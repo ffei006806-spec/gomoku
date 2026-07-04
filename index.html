@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>GOMOKU v1.0.0</title>
+  <title>GOMOKU v2.1.0</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="stylesheet" href="style.css">
   <script src="script.js" defer></script>
@@ -19,12 +19,13 @@
           </span>
           <span class="logo-word">GOMOKU</span>
         </div>
-        <p class="eyebrow">Release v1.0.0</p>
+        <p class="eyebrow">Release v2.1.0</p>
         <h1 id="homeTitle">GOMOKU</h1>
-        <p class="home-summary">A lightweight Gomoku game built with HTML, CSS and JavaScript.</p>
+        <p class="home-summary">A lightweight Gomoku game with local two-player and AI modes.</p>
 
         <div class="home-actions" aria-label="首页操作">
-          <button class="primary-action large-action" id="startGameButton" type="button">Start Game</button>
+          <button class="primary-action large-action" id="localGameButton" type="button">Local Two Player</button>
+          <button class="primary-action large-action ai-action" id="aiGameButton" type="button">Play with AI</button>
           <button class="secondary-action large-action" id="rulesButton" type="button">Rules</button>
           <button class="secondary-action large-action" id="aboutButton" type="button">About</button>
         </div>
@@ -52,7 +53,7 @@
             </span>
             <span class="logo-word">GOMOKU</span>
           </div>
-          <p class="eyebrow">Release v1.0.0</p>
+          <p class="eyebrow" id="modeLabel">Release v2.1.0</p>
         </div>
         <button class="sound-toggle is-on" id="soundToggleButton" type="button" aria-pressed="true">声音 开</button>
       </header>

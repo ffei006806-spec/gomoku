@@ -1,5 +1,5 @@
 /**
- * Gomoku v1.0.0 Final.
+ * Gomoku v2.1.0.
  * 使用原生 JavaScript 管理页面导航、对局状态、弹窗、计时和音效。
  */
 (function bootstrapGomokuApp() {
@@ -14,6 +14,18 @@
   const PLAYERS = Object.freeze({
     BLACK: "black",
     WHITE: "white",
+  });
+
+  const GAME_MODES = Object.freeze({
+    LOCAL: "local",
+    AI: "ai",
+  });
+
+  const AI_CONFIG = Object.freeze({
+    minDelayMs: 300,
+    maxDelayMs: 600,
+    player: "white",
+    human: "black",
   });
 
   const PLAYER_META = Object.freeze({
@@ -58,9 +70,9 @@
     v2: Object.freeze({
       recordStorage: null,
       advancedMoveAnimation: null,
+      strongerAiEngine: null,
     }),
     v3: Object.freeze({
-      aiOpponent: null,
       difficultyStrategy: null,
     }),
     v4: Object.freeze({
@@ -83,6 +95,7 @@
   let gameState = createInitialGameState();
   let activeScreen = "home";
   let modalCloseTimer = 0;
+  let aiMoveTimer = 0;
   let timerId = 0;
   let clockStartedAt = 0;
 
@@ -109,10 +122,12 @@
   function cacheDomElements() {
     elements.homeScreen = document.getElementById("homeScreen");
     elements.gameScreen = document.getElementById("gameScreen");
-    elements.startGameButton = document.getElementById("startGameButton");
+    elements.localGameButton = document.getElementById("localGameButton");
+    elements.aiGameButton = document.getElementById("aiGameButton");
     elements.rulesButton = document.getElementById("rulesButton");
     elements.aboutButton = document.getElementById("aboutButton");
     elements.homeButton = document.getElementById("homeButton");
+    elements.modeLabel = document.getElementById("modeLabel");
     elements.soundToggleButton = document.getElementById("soundToggleButton");
     elements.board = document.getElementById("board");
     elements.boardLines = elements.board.querySelector(".board-lines");
@@ -229,12 +244,14 @@
    * 绑定所有用户交互事件。
    */
   function bindEvents() {
-    elements.startGameButton.addEventListener("click", handleStartGame);
+    elements.localGameButton.addEventListener("click", handleStartLocalGame);
+    elements.aiGameButton.addEventListener("click", handleStartAiGame);
     elements.rulesButton.addEventListener("click", showRulesModal);
     elements.aboutButton.addEventListener("click", showAboutModal);
     elements.homeButton.addEventListener("click", handleHomeRequest);
     elements.soundToggleButton.addEventListener("click", toggleSound);
-    elements.intersections.addEventListener("click", handleBoardClick);
+    elements.board.addEventListener("click", handleBoardClick);
+    elements.board.addEventListener("contextmenu", preventBoardContextMenu);
     elements.undoButton.addEventListener("click", undoMove);
     elements.resetButton.addEventListener("click", requestRestart);
     elements.modal.addEventListener("click", handleModalBackdropClick);
@@ -245,9 +262,10 @@
    * 创建新对局状态。
    * @returns {object} 对局状态。
    */
-  function createInitialGameState() {
+  function createInitialGameState(mode = GAME_MODES.LOCAL) {
     return {
       board: createEmptyBoard(),
+      mode,
       currentPlayer: PLAYERS.BLACK,
       lastMove: null,
       moveHistory: [],
@@ -256,6 +274,7 @@
       winner: null,
       isDraw: false,
       isGameOver: false,
+      isAiThinking: false,
     };
   }
 
@@ -276,9 +295,18 @@
   /**
    * 首页开始按钮入口。
    */
-  function handleStartGame() {
+  function handleStartLocalGame() {
     initializeAudioContext();
-    startNewMatch();
+    startNewMatch(GAME_MODES.LOCAL);
+    showScreen("game");
+  }
+
+  /**
+   * 首页 AI 对战入口，玩家执黑，AI 执白。
+   */
+  function handleStartAiGame() {
+    initializeAudioContext();
+    startNewMatch(GAME_MODES.AI);
     showScreen("game");
   }
 
@@ -307,6 +335,7 @@
    * 确认回到首页并停止计时。
    */
   function confirmGoHome() {
+    cancelAiMove();
     stopTimer();
     closeModal();
     showScreen("home");
@@ -327,8 +356,9 @@
   /**
    * 开始一局新棋，并重置计时器。
    */
-  function startNewMatch() {
-    gameState = createInitialGameState();
+  function startNewMatch(mode = gameState.mode || GAME_MODES.LOCAL) {
+    cancelAiMove();
+    gameState = createInitialGameState(mode);
     closeModal();
     startTimer();
     renderGame();
@@ -347,20 +377,87 @@
    * @param {MouseEvent} event 点击事件。
    */
   function handleBoardClick(event) {
+    if (gameState.isGameOver || isHumanInputLocked()) {
+      return;
+    }
+
+    const movePoint = getMovePointFromEvent(event);
+
+    if (!movePoint || !isValidMove(movePoint.row, movePoint.col)) {
+      return;
+    }
+
+    playMove(movePoint.row, movePoint.col);
+  }
+
+  /**
+   * Resolve a board interaction to the nearest playable intersection.
+   * @param {MouseEvent} event Board click event.
+   * @returns {{row: number, col: number}|null} Board point or null.
+   */
+  function getMovePointFromEvent(event) {
+    const pointFromPointer = getNearestIntersectionFromPointer(event);
+
+    if (pointFromPointer) {
+      return pointFromPointer;
+    }
+
     const cell = event.target.closest(".cell");
 
-    if (!cell || gameState.isGameOver) {
-      return;
+    if (!cell) {
+      return null;
     }
 
-    const row = Number(cell.dataset.row);
-    const col = Number(cell.dataset.col);
+    return {
+      row: Number(cell.dataset.row),
+      col: Number(cell.dataset.col),
+    };
+  }
 
-    if (!isValidMove(row, col)) {
-      return;
+  /**
+   * Convert a pointer position to the nearest 15 x 15 board coordinate.
+   * @param {MouseEvent} event Board click event.
+   * @returns {{row: number, col: number}|null} Nearest board point.
+   */
+  function getNearestIntersectionFromPointer(event) {
+    if (typeof event.clientX !== "number" || typeof event.clientY !== "number") {
+      return null;
     }
 
-    playMove(row, col);
+    if (event.clientX === 0 && event.clientY === 0) {
+      return null;
+    }
+
+    const rect = elements.intersections.getBoundingClientRect();
+
+    if (rect.width <= 0 || rect.height <= 0) {
+      return null;
+    }
+
+    const colRatio = (event.clientX - rect.left) / rect.width;
+    const rowRatio = (event.clientY - rect.top) / rect.height;
+
+    return {
+      row: clampBoardIndex(Math.round(rowRatio * (BOARD_SIZE - 1))),
+      col: clampBoardIndex(Math.round(colRatio * (BOARD_SIZE - 1))),
+    };
+  }
+
+  /**
+   * Clamp a board index into the valid 0-14 range.
+   * @param {number} index Raw board index.
+   * @returns {number} Valid board index.
+   */
+  function clampBoardIndex(index) {
+    return Math.min(BOARD_SIZE - 1, Math.max(0, index));
+  }
+
+  /**
+   * Prevent the native long-press menu while playing on touch devices.
+   * @param {Event} event Context menu event.
+   */
+  function preventBoardContextMenu(event) {
+    event.preventDefault();
   }
 
   /**
@@ -400,6 +497,7 @@
 
     gameState.currentPlayer = getNextPlayer(player);
     renderGame();
+    scheduleAiMoveIfNeeded();
   }
 
   /**
@@ -410,13 +508,427 @@
       return;
     }
 
-    const lastMove = gameState.moveHistory.pop();
-    gameState.board[lastMove.row][lastMove.col] = EMPTY_CELL;
-    gameState.currentPlayer = lastMove.player;
+    cancelAiMove();
+    undoRecentMoves(getUndoStepCount());
     gameState.lastMove = gameState.moveHistory[gameState.moveHistory.length - 1] || null;
-    gameState.moveCount -= 1;
+    gameState.currentPlayer = gameState.mode === GAME_MODES.AI ? PLAYERS.BLACK : getUndoTurnPlayer();
+    gameState.isAiThinking = false;
     playSound("undo");
     renderGame();
+  }
+
+  /**
+   * 根据当前模式获取悔棋步数。
+   * @returns {number} 需要撤销的步数。
+   */
+  function getUndoStepCount() {
+    if (gameState.mode !== GAME_MODES.AI) {
+      return 1;
+    }
+
+    return Math.min(2, gameState.moveHistory.length);
+  }
+
+  /**
+   * 从棋盘和历史中撤销最近若干步。
+   * @param {number} stepCount 撤销步数。
+   */
+  function undoRecentMoves(stepCount) {
+    for (let index = 0; index < stepCount; index += 1) {
+      const move = gameState.moveHistory.pop();
+
+      if (!move) {
+        return;
+      }
+
+      gameState.board[move.row][move.col] = EMPTY_CELL;
+      gameState.moveCount -= 1;
+    }
+  }
+
+  /**
+   * 本地双人悔棋后轮到被撤销的一方继续下。
+   * @returns {string} 下一手玩家。
+   */
+  function getUndoTurnPlayer() {
+    const lastMove = gameState.moveHistory[gameState.moveHistory.length - 1];
+    return lastMove ? getNextPlayer(lastMove.player) : PLAYERS.BLACK;
+  }
+
+  /**
+   * 判断当前是否应阻止人工点击棋盘。
+   * @returns {boolean} 是否锁定人工输入。
+   */
+  function isHumanInputLocked() {
+    return gameState.isAiThinking || (gameState.mode === GAME_MODES.AI && gameState.currentPlayer === AI_CONFIG.player);
+  }
+
+  /**
+   * 如果当前是 AI 回合，延迟调度 AI 落子。
+   */
+  function scheduleAiMoveIfNeeded() {
+    if (gameState.mode !== GAME_MODES.AI || gameState.currentPlayer !== AI_CONFIG.player || gameState.isGameOver) {
+      return;
+    }
+
+    gameState.isAiThinking = true;
+    renderGame();
+    aiMoveTimer = window.setTimeout(playAiMove, getAiDelay());
+  }
+
+  /**
+   * 清除待执行的 AI 落子。
+   */
+  function cancelAiMove() {
+    if (aiMoveTimer) {
+      window.clearTimeout(aiMoveTimer);
+      aiMoveTimer = 0;
+    }
+
+    if (gameState) {
+      gameState.isAiThinking = false;
+    }
+  }
+
+  /**
+   * 执行 AI 落子。
+   */
+  function playAiMove() {
+    aiMoveTimer = 0;
+
+    if (gameState.mode !== GAME_MODES.AI || gameState.currentPlayer !== AI_CONFIG.player || gameState.isGameOver) {
+      gameState.isAiThinking = false;
+      renderGame();
+      return;
+    }
+
+    const move = chooseAiMove(gameState.board);
+    gameState.isAiThinking = false;
+
+    if (move) {
+      playMove(move.row, move.col);
+      return;
+    }
+
+    renderGame();
+  }
+
+  /**
+   * 获取 AI 思考延迟。
+   * @returns {number} 延迟毫秒数。
+   */
+  function getAiDelay() {
+    const range = AI_CONFIG.maxDelayMs - AI_CONFIG.minDelayMs;
+    return AI_CONFIG.minDelayMs + Math.round(Math.random() * range);
+  }
+
+  /**
+   * AI Engine：根据当前棋盘选择白棋落点。
+   * @param {Array<Array<null|string>>} board 棋盘数据。
+   * @returns {{row: number, col: number}|null} AI 落点。
+   */
+  function chooseAiMove(board) {
+    const candidates = getCandidateMoves(board);
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    const winningMove = findImmediateWinningMove(board, AI_CONFIG.player, candidates);
+
+    if (winningMove) {
+      return winningMove;
+    }
+
+    const blockingMove = findImmediateWinningMove(board, AI_CONFIG.human, candidates);
+
+    if (blockingMove) {
+      return blockingMove;
+    }
+
+    return candidates
+      .map((move) => ({
+        ...move,
+        score: scoreAiMove(board, move.row, move.col),
+      }))
+      .sort(compareAiMoves)[0];
+  }
+
+  /**
+   * 生成靠近已有棋子的候选落点，避免 AI 无意义地下到远处边角。
+   * @param {Array<Array<null|string>>} board 棋盘数据。
+   * @returns {Array<{row: number, col: number}>} 候选落点。
+   */
+  function getCandidateMoves(board) {
+    const candidates = [];
+    const candidateKeys = new Set();
+    const center = Math.floor(BOARD_SIZE / 2);
+
+    if (isBoardEmpty(board)) {
+      return [{ row: center, col: center }];
+    }
+
+    for (let row = 0; row < BOARD_SIZE; row += 1) {
+      for (let col = 0; col < BOARD_SIZE; col += 1) {
+        if (board[row][col] !== EMPTY_CELL) {
+          addNearbyCandidates(board, row, col, candidateKeys, candidates);
+        }
+      }
+    }
+
+    return candidates.length ? candidates : [{ row: center, col: center }];
+  }
+
+  /**
+   * 添加某个已有棋子周围两格范围内的空位。
+   * @param {Array<Array<null|string>>} board 棋盘数据。
+   * @param {number} originRow 原始行。
+   * @param {number} originCol 原始列。
+   * @param {Set<string>} candidateKeys 去重集合。
+   * @param {Array<{row: number, col: number}>} candidates 候选数组。
+   */
+  function addNearbyCandidates(board, originRow, originCol, candidateKeys, candidates) {
+    for (let rowOffset = -2; rowOffset <= 2; rowOffset += 1) {
+      for (let colOffset = -2; colOffset <= 2; colOffset += 1) {
+        const row = originRow + rowOffset;
+        const col = originCol + colOffset;
+        const key = `${row}:${col}`;
+
+        if (!isInsideBoard(row, col) || board[row][col] !== EMPTY_CELL || candidateKeys.has(key)) {
+          continue;
+        }
+
+        candidateKeys.add(key);
+        candidates.push({ row, col });
+      }
+    }
+  }
+
+  /**
+   * 判断棋盘是否为空。
+   * @param {Array<Array<null|string>>} board 棋盘数据。
+   * @returns {boolean} 是否没有任何棋子。
+   */
+  function isBoardEmpty(board) {
+    for (let row = 0; row < BOARD_SIZE; row += 1) {
+      for (let col = 0; col < BOARD_SIZE; col += 1) {
+        if (board[row][col] !== EMPTY_CELL) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * 查找某一方的一步取胜落点。
+   * @param {Array<Array<null|string>>} board 棋盘数据。
+   * @param {string} player 玩家。
+   * @param {Array<{row: number, col: number}>} candidates 候选落点。
+   * @returns {{row: number, col: number}|null} 取胜落点。
+   */
+  function findImmediateWinningMove(board, player, candidates) {
+    for (let index = 0; index < candidates.length; index += 1) {
+      const move = candidates[index];
+
+      board[move.row][move.col] = player;
+
+      if (hasFiveInRowOnBoard(board, move.row, move.col, player)) {
+        board[move.row][move.col] = EMPTY_CELL;
+        return move;
+      }
+
+      board[move.row][move.col] = EMPTY_CELL;
+    }
+
+    return null;
+  }
+
+  /**
+   * 给 AI 候选点打分。
+   * @param {Array<Array<null|string>>} board 棋盘数据。
+   * @param {number} row 行索引。
+   * @param {number} col 列索引。
+   * @returns {number} 评分。
+   */
+  function scoreAiMove(board, row, col) {
+    const aiScore = scoreMoveForPlayer(board, row, col, AI_CONFIG.player);
+    const humanScore = scoreMoveForPlayer(board, row, col, AI_CONFIG.human);
+    const centerScore = scoreCenterDistance(row, col);
+    const neighborScore = scoreNeighborDensity(board, row, col);
+
+    return aiScore * 1.12 + humanScore + centerScore + neighborScore;
+  }
+
+  /**
+   * 对某个玩家在指定位置的连线潜力评分。
+   * @param {Array<Array<null|string>>} board 棋盘数据。
+   * @param {number} row 行索引。
+   * @param {number} col 列索引。
+   * @param {string} player 玩家。
+   * @returns {number} 评分。
+   */
+  function scoreMoveForPlayer(board, row, col, player) {
+    let score = 0;
+
+    board[row][col] = player;
+
+    for (let index = 0; index < DIRECTIONS.length; index += 1) {
+      const direction = DIRECTIONS[index];
+      const pattern = analyzeLinePattern(board, row, col, direction.row, direction.col, player);
+      score += scoreLinePattern(pattern);
+    }
+
+    board[row][col] = EMPTY_CELL;
+    return score;
+  }
+
+  /**
+   * 分析某方向的连续棋子与开放端。
+   * @param {Array<Array<null|string>>} board 棋盘数据。
+   * @param {number} row 行索引。
+   * @param {number} col 列索引。
+   * @param {number} rowStep 行步长。
+   * @param {number} colStep 列步长。
+   * @param {string} player 玩家。
+   * @returns {{count: number, openEnds: number}} 线形。
+   */
+  function analyzeLinePattern(board, row, col, rowStep, colStep, player) {
+    const forward = countDirectionalPattern(board, row, col, rowStep, colStep, player);
+    const backward = countDirectionalPattern(board, row, col, -rowStep, -colStep, player);
+
+    return {
+      count: 1 + forward.count + backward.count,
+      openEnds: forward.isOpen + backward.isOpen,
+    };
+  }
+
+  /**
+   * 统计单方向连续棋子和末端是否开放。
+   * @param {Array<Array<null|string>>} board 棋盘数据。
+   * @param {number} row 行索引。
+   * @param {number} col 列索引。
+   * @param {number} rowStep 行步长。
+   * @param {number} colStep 列步长。
+   * @param {string} player 玩家。
+   * @returns {{count: number, isOpen: number}} 方向线形。
+   */
+  function countDirectionalPattern(board, row, col, rowStep, colStep, player) {
+    let count = 0;
+    let nextRow = row + rowStep;
+    let nextCol = col + colStep;
+
+    while (isInsideBoard(nextRow, nextCol) && board[nextRow][nextCol] === player) {
+      count += 1;
+      nextRow += rowStep;
+      nextCol += colStep;
+    }
+
+    return {
+      count,
+      isOpen: Number(isInsideBoard(nextRow, nextCol) && board[nextRow][nextCol] === EMPTY_CELL),
+    };
+  }
+
+  /**
+   * 根据线形返回战术分。
+   * @param {{count: number, openEnds: number}} pattern 线形。
+   * @returns {number} 评分。
+   */
+  function scoreLinePattern(pattern) {
+    if (pattern.count >= 5) {
+      return 1_000_000;
+    }
+
+    if (pattern.count === 4 && pattern.openEnds === 2) {
+      return 140_000;
+    }
+
+    if (pattern.count === 4 && pattern.openEnds === 1) {
+      return 70_000;
+    }
+
+    if (pattern.count === 3 && pattern.openEnds === 2) {
+      return 16_000;
+    }
+
+    if (pattern.count === 3 && pattern.openEnds === 1) {
+      return 4_000;
+    }
+
+    if (pattern.count === 2 && pattern.openEnds === 2) {
+      return 900;
+    }
+
+    if (pattern.count === 2 && pattern.openEnds === 1) {
+      return 240;
+    }
+
+    return pattern.openEnds === 2 ? 70 : 10;
+  }
+
+  /**
+   * 中心区域加分，避免无意义边角落子。
+   * @param {number} row 行索引。
+   * @param {number} col 列索引。
+   * @returns {number} 中心分。
+   */
+  function scoreCenterDistance(row, col) {
+    const center = (BOARD_SIZE - 1) / 2;
+    const distance = Math.abs(row - center) + Math.abs(col - center);
+    return Math.max(0, 32 - distance * 2);
+  }
+
+  /**
+   * 周围已有棋子越多，候选点价值越高。
+   * @param {Array<Array<null|string>>} board 棋盘数据。
+   * @param {number} row 行索引。
+   * @param {number} col 列索引。
+   * @returns {number} 邻近分。
+   */
+  function scoreNeighborDensity(board, row, col) {
+    let score = 0;
+
+    for (let rowOffset = -2; rowOffset <= 2; rowOffset += 1) {
+      for (let colOffset = -2; colOffset <= 2; colOffset += 1) {
+        const nextRow = row + rowOffset;
+        const nextCol = col + colOffset;
+
+        if (!isInsideBoard(nextRow, nextCol) || board[nextRow][nextCol] === EMPTY_CELL) {
+          continue;
+        }
+
+        score += Math.max(1, 4 - Math.abs(rowOffset) - Math.abs(colOffset));
+      }
+    }
+
+    return score * 6;
+  }
+
+  /**
+   * 比较 AI 候选点，分数相同则更靠近中心者优先。
+   * @param {object} first 第一个候选。
+   * @param {object} second 第二个候选。
+   * @returns {number} 排序结果。
+   */
+  function compareAiMoves(first, second) {
+    if (second.score !== first.score) {
+      return second.score - first.score;
+    }
+
+    return getCenterDistance(first.row, first.col) - getCenterDistance(second.row, second.col);
+  }
+
+  /**
+   * 获取曼哈顿中心距离。
+   * @param {number} row 行索引。
+   * @param {number} col 列索引。
+   * @returns {number} 中心距离。
+   */
+  function getCenterDistance(row, col) {
+    const center = (BOARD_SIZE - 1) / 2;
+    return Math.abs(row - center) + Math.abs(col - center);
   }
 
   /**
@@ -430,9 +942,16 @@
       body: ["当前棋局会被清空，胜场统计将保留。"],
       actions: [
         { label: "取消", style: "secondary", handler: closeModal },
-        { label: "重新开始", style: "primary", handler: startNewMatch },
+        { label: "重新开始", style: "primary", handler: restartCurrentMode },
       ],
     });
+  }
+
+  /**
+   * 保留当前模式重新开始一局。
+   */
+  function restartCurrentMode() {
+    startNewMatch(gameState.mode || GAME_MODES.LOCAL);
   }
 
   /**
@@ -466,7 +985,7 @@
       body: ["棋盘已满，双方未形成五子连珠。"],
       actions: [
         { label: "查看棋局", style: "secondary", handler: closeModal },
-        { label: "再来一局", style: "primary", handler: startNewMatch },
+        { label: "再来一局", style: "primary", handler: restartCurrentMode },
       ],
     });
   }
@@ -486,7 +1005,7 @@
       body: [`第 ${gameState.moveCount} 手，${lastMove} 完成五子连珠。`],
       actions: [
         { label: "查看棋局", style: "secondary", handler: closeModal },
-        { label: "再来一局", style: "primary", handler: startNewMatch },
+        { label: "再来一局", style: "primary", handler: restartCurrentMode },
       ],
     });
   }
@@ -574,8 +1093,8 @@
     logo.className = "product-logo";
     stones.className = "logo-stones";
     logoWord.textContent = "GOMOKU";
-    version.textContent = "Version 1.0.0";
-    description.textContent = "A lightweight Gomoku game built with HTML, CSS and JavaScript.";
+    version.textContent = "Version 2.0.0";
+    description.textContent = "A lightweight Gomoku game with local two-player and AI modes.";
     creator.textContent = "Created by Binbin.";
     collaboration.textContent = "Built with AI collaboration.";
 
@@ -620,7 +1139,7 @@
       const isLastMove = isLastMoveCell(row, col);
 
       cell.className = createCellClassName(player, isOccupied, isLastMove);
-      cell.disabled = gameState.isGameOver || isOccupied;
+      cell.disabled = gameState.isGameOver || isOccupied || isHumanInputLocked();
       cell.setAttribute("aria-label", createCellAriaLabel(row, col, player, isLastMove));
     }
   }
@@ -639,6 +1158,7 @@
     elements.sideTimerText.textContent = formatTime(gameState.elapsedSeconds);
     elements.turnStone.className = `mini-stone ${activeMeta.stoneClass}`;
     elements.turnText.textContent = getTurnDisplayText();
+    elements.modeLabel.textContent = getModeLabelText();
     elements.turnCard.classList.toggle("is-ended", gameState.isGameOver);
   }
 
@@ -716,7 +1236,19 @@
       return "平局";
     }
 
+    if (gameState.isAiThinking) {
+      return "AI 思考中";
+    }
+
     return PLAYER_META[gameState.currentPlayer].turnText;
+  }
+
+  /**
+   * 获取顶部模式标签文案。
+   * @returns {string} 模式文案。
+   */
+  function getModeLabelText() {
+    return gameState.mode === GAME_MODES.AI ? "v2.1.0 · Play with AI" : "v2.1.0 · Local Two Player";
   }
 
   /**
@@ -730,6 +1262,14 @@
 
     if (gameState.isDraw) {
       return "平局";
+    }
+
+    if (gameState.isAiThinking) {
+      return "AI 正在思考";
+    }
+
+    if (gameState.mode === GAME_MODES.AI) {
+      return gameState.currentPlayer === PLAYERS.BLACK ? "玩家回合" : "AI 回合";
     }
 
     return "对局进行中";
@@ -756,12 +1296,24 @@
    * @returns {boolean} 是否获胜。
    */
   function hasFiveInRow(row, col, player) {
+    return hasFiveInRowOnBoard(gameState.board, row, col, player);
+  }
+
+  /**
+   * 在指定棋盘上检查某次落子是否形成五子连珠。
+   * @param {Array<Array<null|string>>} board 棋盘数据。
+   * @param {number} row 行索引。
+   * @param {number} col 列索引。
+   * @param {string} player 玩家标识。
+   * @returns {boolean} 是否获胜。
+   */
+  function hasFiveInRowOnBoard(board, row, col, player) {
     for (let index = 0; index < DIRECTIONS.length; index += 1) {
       const direction = DIRECTIONS[index];
       const total =
         1 +
-        countContinuousStones(row, col, direction.row, direction.col, player) +
-        countContinuousStones(row, col, -direction.row, -direction.col, player);
+        countContinuousStones(board, row, col, direction.row, direction.col, player) +
+        countContinuousStones(board, row, col, -direction.row, -direction.col, player);
 
       if (total >= WIN_LENGTH) {
         return true;
@@ -780,12 +1332,12 @@
    * @param {string} player 玩家标识。
    * @returns {number} 连续棋子数量。
    */
-  function countContinuousStones(row, col, rowStep, colStep, player) {
+  function countContinuousStones(board, row, col, rowStep, colStep, player) {
     let count = 0;
     let nextRow = row + rowStep;
     let nextCol = col + colStep;
 
-    while (isInsideBoard(nextRow, nextCol) && gameState.board[nextRow][nextCol] === player) {
+    while (isInsideBoard(nextRow, nextCol) && board[nextRow][nextCol] === player) {
       count += 1;
       nextRow += rowStep;
       nextCol += colStep;

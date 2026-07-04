@@ -1,6 +1,6 @@
 # Versioning Strategy
 
-This project is currently preserved as `v1.0.0-rc`.
+The first release candidate is preserved as `v1.0.0-rc`. The current development target is `v2.1.0`.
 
 ## Version Names
 
@@ -25,10 +25,16 @@ vMAJOR.MINOR.PATCH-rc.1
 vMAJOR.MINOR.PATCH-beta.1
 ```
 
-Current version:
+Preserved release candidate:
 
 ```text
 v1.0.0-rc
+```
+
+Current version:
+
+```text
+v2.1.0
 ```
 
 ## Release Candidate Rule
@@ -41,6 +47,8 @@ Before any new development begins:
 2. Record the reason for the new work in `CHANGELOG.md`.
 3. Make changes only after the backup exists.
 4. Run checks before marking a new version.
+
+For v2.1.0 development, a pre-development backup was created in `backups/Gomoku-v2.0.0-before-mobile-adaptation.zip`.
 
 ## Local Backup Zip Rule
 
@@ -118,4 +126,3 @@ Recommended changelog section for future work:
 
 ### Fixed
 ```
-
