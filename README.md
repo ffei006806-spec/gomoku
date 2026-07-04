@@ -2,7 +2,7 @@
 
 A lightweight Gomoku game built with HTML, CSS and JavaScript.
 
-Current version: `v2.1.0`
+Current version: `v2.1.1`
 
 Created by Binbin. Built with AI collaboration.
 
@@ -54,7 +54,7 @@ The AI is designed to feel reasonable, not unbeatable.
 
 ## Mobile Support
 
-GOMOKU v2.1.0 adds responsive mobile and tablet play:
+GOMOKU v2.1.1 supports responsive mobile and tablet play:
 
 - The board scales to the available viewport width.
 - Touch input resolves to the nearest board intersection.

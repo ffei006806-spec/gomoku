@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 This project uses local release-candidate backups before new development begins. See [docs/versioning.md](docs/versioning.md) for the versioning and backup rules.
 
+## [v2.1.1] - 2026-07-04
+
+### Changed
+
+- Reduced mobile stone size to prevent overlap.
+- Preserved touch hit area for usability.
+
 ## [v2.1.0] - 2026-07-04
 
 ### Added

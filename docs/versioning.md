@@ -1,6 +1,6 @@
 # Versioning Strategy
 
-The first release candidate is preserved as `v1.0.0-rc`. The current development target is `v2.1.0`.
+The first release candidate is preserved as `v1.0.0-rc`. The current development target is `v2.1.1`.
 
 ## Version Names
 
@@ -34,7 +34,7 @@ v1.0.0-rc
 Current version:
 
 ```text
-v2.1.0
+v2.1.1
 ```
 
 ## Release Candidate Rule

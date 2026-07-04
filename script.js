@@ -1,5 +1,5 @@
 /**
- * Gomoku v2.1.0.
+ * Gomoku v2.1.1.
  * 使用原生 JavaScript 管理页面导航、对局状态、弹窗、计时和音效。
  */
 (function bootstrapGomokuApp() {
@@ -1248,7 +1248,7 @@
    * @returns {string} 模式文案。
    */
   function getModeLabelText() {
-    return gameState.mode === GAME_MODES.AI ? "v2.1.0 · Play with AI" : "v2.1.0 · Local Two Player";
+    return gameState.mode === GAME_MODES.AI ? "v2.1.1 · Play with AI" : "v2.1.1 · Local Two Player";
   }
 
   /**
