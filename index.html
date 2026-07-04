@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>GOMOKU v1.0.0</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <main class="app" id="app">
+    <section class="home-screen screen is-active" id="homeScreen" aria-labelledby="homeTitle">
+      <div class="home-copy">
+        <div class="product-logo" aria-label="GOMOKU">
+          <span class="logo-stones" aria-hidden="true">
+            <span class="logo-stone logo-stone-black"></span>
+            <span class="logo-stone logo-stone-white"></span>
+          </span>
+          <span class="logo-word">GOMOKU</span>
+        </div>
+        <p class="eyebrow">Release v1.0.0</p>
+        <h1 id="homeTitle">GOMOKU</h1>
+        <p class="home-summary">A lightweight Gomoku game built with HTML, CSS and JavaScript.</p>
+
+        <div class="home-actions" aria-label="首页操作">
+          <button class="primary-action large-action" id="startGameButton" type="button">Start Game</button>
+          <button class="secondary-action large-action" id="rulesButton" type="button">Rules</button>
+          <button class="secondary-action large-action" id="aboutButton" type="button">About</button>
+        </div>
+      </div>
+
+      <div class="home-preview" aria-hidden="true">
+        <div class="preview-board">
+          <span class="preview-stone preview-black stone-a"></span>
+          <span class="preview-stone preview-white stone-b"></span>
+          <span class="preview-stone preview-black stone-c"></span>
+          <span class="preview-stone preview-white stone-d"></span>
+          <span class="preview-stone preview-black stone-e"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="game-screen screen" id="gameScreen" aria-label="五子棋对局" hidden>
+      <header class="game-topbar">
+        <button class="ghost-action" id="homeButton" type="button">Home</button>
+        <div class="brand-lockup">
+          <div class="product-logo compact" aria-label="GOMOKU">
+            <span class="logo-stones" aria-hidden="true">
+              <span class="logo-stone logo-stone-black"></span>
+              <span class="logo-stone logo-stone-white"></span>
+            </span>
+            <span class="logo-word">GOMOKU</span>
+          </div>
+          <p class="eyebrow">Release v1.0.0</p>
+        </div>
+        <button class="sound-toggle is-on" id="soundToggleButton" type="button" aria-pressed="true">声音 开</button>
+      </header>
+
+      <section class="match-bar" aria-label="对局信息">
+        <article class="match-stat">
+          <span class="mini-stone is-black" aria-hidden="true"></span>
+          <div>
+            <p>黑棋胜场</p>
+            <strong id="blackWins">0</strong>
+          </div>
+        </article>
+        <article class="match-stat">
+          <span class="mini-stone is-white" aria-hidden="true"></span>
+          <div>
+            <p>白棋胜场</p>
+            <strong id="whiteWins">0</strong>
+          </div>
+        </article>
+        <article class="match-stat">
+          <p>步数</p>
+          <strong id="moveCount">0</strong>
+        </article>
+        <article class="match-stat">
+          <p>计时</p>
+          <strong id="timerText">00:00</strong>
+        </article>
+        <article class="match-stat current-turn" id="turnCard">
+          <span class="mini-stone is-black" id="turnStone" aria-hidden="true"></span>
+          <div>
+            <p>当前回合</p>
+            <strong id="turnText">黑棋</strong>
+          </div>
+        </article>
+      </section>
+
+      <div class="game-layout">
+        <section class="board-section" aria-label="棋盘">
+          <div class="board-frame">
+            <div class="board is-black-turn" id="board" role="grid" aria-label="15×15 五子棋棋盘">
+              <div class="board-lines" aria-hidden="true"></div>
+              <div class="star-points" id="starPoints" aria-hidden="true"></div>
+              <div class="intersections" id="intersections"></div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="side-panel" aria-label="游戏控制">
+          <div class="status-card">
+            <p class="panel-label">状态</p>
+            <p class="status-text" id="gameStatus">对局进行中</p>
+          </div>
+
+          <dl class="stats-list">
+            <div class="stat-row">
+              <dt>最后一步</dt>
+              <dd id="lastMove">暂无</dd>
+            </div>
+            <div class="stat-row">
+              <dt>总手数</dt>
+              <dd id="sideMoveCount">0</dd>
+            </div>
+            <div class="stat-row">
+              <dt>本局用时</dt>
+              <dd id="sideTimerText">00:00</dd>
+            </div>
+          </dl>
+
+          <div class="panel-actions">
+            <button class="secondary-action" id="undoButton" type="button" disabled>悔棋</button>
+            <button class="primary-action" id="resetButton" type="button">重新开始</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal" id="appModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
+    <div class="modal-card">
+      <p class="modal-kicker" id="modalKicker">提示</p>
+      <h2 id="modalTitle">标题</h2>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </div>
+</body>
+</html>
