@@ -1342,6 +1342,19 @@ button:disabled {
   }
 }
 
+
+/* v3.0.17：触屏设备完全关闭棋子 hover 虚影，避免手机版人机对战点击后残留预览。 */
+@media (hover: none), (pointer: coarse) {
+  .board .cell.is-empty:hover .stone,
+  .board .cell.is-empty:active .stone,
+  .board .cell.is-empty:focus .stone {
+    opacity: 0 !important;
+    transform: scale(0) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1353,7 +1366,7 @@ button:disabled {
   }
 }
 
-/* v3.0.16：复制提示与手机按钮体验优化 */
+/* v3.0.17：复制提示与手机按钮体验优化 */
 .secondary-action.is-copy-success {
   color: #fff;
   background: var(--accent);

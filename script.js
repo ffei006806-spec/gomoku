@@ -1,5 +1,5 @@
 /**
- * Gomoku v3.0.16.
+ * Gomoku v3.0.17.
  * 使用原生 JavaScript 管理页面导航、对局状态、弹窗、计时和音效。
  */
 (function bootstrapGomokuApp() {
@@ -10,7 +10,7 @@
   const EMPTY_CELL = null;
   const MODAL_TRANSITION_MS = 190;
   const MOVE_SOUND_VOLUME = 0.058;
-  const APP_VERSION = "v3.0.16";
+  const APP_VERSION = "v3.0.17";
   const COORDINATE_LABELS = Object.freeze("ABCDEFGHIJKLMNO".split(""));
 
   const PLAYERS = Object.freeze({
