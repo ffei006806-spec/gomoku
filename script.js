@@ -1,5 +1,5 @@
 /**
- * Gomoku v3.0.15.
+ * Gomoku v3.0.16.
  * 使用原生 JavaScript 管理页面导航、对局状态、弹窗、计时和音效。
  */
 (function bootstrapGomokuApp() {
@@ -10,7 +10,7 @@
   const EMPTY_CELL = null;
   const MODAL_TRANSITION_MS = 190;
   const MOVE_SOUND_VOLUME = 0.058;
-  const APP_VERSION = "v3.0.15";
+  const APP_VERSION = "v3.0.16";
   const COORDINATE_LABELS = Object.freeze("ABCDEFGHIJKLMNO".split(""));
 
   const PLAYERS = Object.freeze({
@@ -118,6 +118,7 @@
   let modalCloseTimer = 0;
   let aiMoveTimer = 0;
   let timerId = 0;
+  let copyFeedbackTimer = 0;
   let clockStartedAt = 0;
 
   window.GomokuExtensionPoints = EXTENSION_POINTS;
@@ -570,16 +571,17 @@
   }
 
   function showOnline已完成Modal(room) {
-    const title = room.winner === "draw" ? "平局" : `${getRoleDisplayName(room.winner)}获胜`;
+    const title = room.winner === "draw" ? "平局" : `${getRoleDisplayName(room.winner)}胜`;
+    const resultText = room.winner === "draw" ? "本局双方战成平局。" : `${getRoleDisplayName(room.winner)}赢下本局。`;
 
     openModal({
       type: MODAL_TYPES.RESULT,
       kicker: "在线对局结束",
       title,
-      body: ["Both players can vote to restart the room."],
+      body: [resultText, "想再来一局，需要双方都确认。"],
       actions: [
         { label: "查看棋局", style: "secondary", handler: closeModal },
-        { label: "申请重开", style: "primary", handler: requestOnlineRestart },
+        { label: "再来一局", style: "primary", handler: requestOnlineRestart },
       ],
     });
   }
@@ -603,6 +605,7 @@
     onlineState.lastSyncedMoveCount = 0;
     onlineState.lastResultKey = "";
     onlineState.last已结束RoomId = "";
+    resetCopyRoomCodeFeedback();
   }
 
   async function handleOnlineBoardMove(row, col) {
@@ -644,7 +647,33 @@
     return isValidMove(row, col);
   }
 
-  async function requestOnlineRestart() {
+  function requestOnlineRestart() {
+    if (!onlineState.session || onlineState.pendingRestart) {
+      return;
+    }
+
+    if (hasThisPlayerVotedRestart()) {
+      showOnlineNotice("已申请再来一局", "你的申请已经发送，正在等待对方确认。");
+      return;
+    }
+
+    const isFinished = onlineState.room && onlineState.room.status === ONLINE_ROOM_STATUS.FINISHED;
+    openModal({
+      type: MODAL_TYPES.CONFIRM,
+      kicker: "再来一局",
+      title: isFinished ? "确认再来一局？" : "申请再来一局？",
+      body: [
+        "在线对局需要双方都同意后才会重新开始。",
+        "确认后会向对方发送再来一局申请。",
+      ],
+      actions: [
+        { label: "取消", style: "secondary", handler: closeModal },
+        { label: "确认申请", style: "primary", handler: submitOnlineRestartVote },
+      ],
+    });
+  }
+
+  async function submitOnlineRestartVote() {
     if (!onlineState.session || onlineState.pendingRestart) {
       return;
     }
@@ -655,8 +684,9 @@
 
     try {
       await getRoomManager().voteRestart(onlineState.session);
+      showOnlineNotice("申请已发送", "已向对方发送再来一局申请。对方确认后会自动开始新一局。");
     } catch (error) {
-      showOnlineNotice("无法重新开始", getErrorMessage(error));
+      showOnlineNotice("无法再来一局", getErrorMessage(error));
     } finally {
       onlineState.pendingRestart = false;
       renderGame();
@@ -670,10 +700,39 @@
 
     try {
       const copied = await getOnlineController().copyText(onlineState.session.roomId);
-      elements.onlineOpponentStatus.textContent = copied ? "房间号已复制。" : "当前浏览器不支持复制。";
+
+      if (copied) {
+        elements.onlineOpponentStatus.textContent = `房间号 ${onlineState.session.roomId} 已复制，可以发给对方加入。`;
+        showCopyRoomCodeFeedback();
+        return;
+      }
+
+      elements.onlineOpponentStatus.textContent = "当前浏览器不支持自动复制，请手动复制房间号。";
     } catch (error) {
       elements.onlineOpponentStatus.textContent = getErrorMessage(error);
     }
+  }
+
+  function showCopyRoomCodeFeedback() {
+    window.clearTimeout(copyFeedbackTimer);
+    elements.copyRoomCodeButton.textContent = "已复制 ✓";
+    elements.copyRoomCodeButton.classList.add("is-copy-success");
+
+    copyFeedbackTimer = window.setTimeout(() => {
+      resetCopyRoomCodeFeedback();
+    }, 2200);
+  }
+
+  function resetCopyRoomCodeFeedback() {
+    window.clearTimeout(copyFeedbackTimer);
+    copyFeedbackTimer = 0;
+
+    if (!elements.copyRoomCodeButton) {
+      return;
+    }
+
+    elements.copyRoomCodeButton.textContent = "复制房间号";
+    elements.copyRoomCodeButton.classList.remove("is-copy-success");
   }
 
   function requestLeaveOnlineRoom() {
@@ -686,7 +745,7 @@
       type: MODAL_TYPES.CONFIRM,
       kicker: "离开房间",
       title: "确定离开这个在线房间吗？",
-      body: ["The room will be marked abandoned only because you are leaving on purpose."],
+      body: ["离开后会释放你的席位；如果房间里没有玩家了，房间会自动删除。"],
       actions: [
         { label: "继续对局", style: "secondary", handler: closeModal },
         { label: "离开房间", style: "primary", handler: confirmLeaveOnlineRoom },
@@ -1556,7 +1615,7 @@
     logo.className = "product-logo";
     stones.className = "logo-stones";
     logoWord.textContent = "GOMOKU";
-    version.textContent = "版本 3.0.13";
+    version.textContent = `版本 ${APP_VERSION.replace("v", "")}`;
     description.textContent = "支持本地双人、AI 对战和在线联机的五子棋游戏。";
     creator.textContent = "Binbin 出品。";
     collaboration.textContent = "由 AI 协作完成。";
@@ -1665,19 +1724,21 @@
 
     elements.onlineRoomCode.textContent = onlineState.session.roomId;
     elements.onlineRoomMeta.textContent = `${getRoleDisplayName(role)} · ${getOnlineRoomStatusText(room)}`;
-    elements.onlineOpponentStatus.textContent = getOpponentStatusText(opponent);
+    if (!elements.copyRoomCodeButton.classList.contains("is-copy-success")) {
+      elements.onlineOpponentStatus.textContent = getOpponentStatusText(opponent);
+    }
   }
 
   function getOnlineRestartButtonText() {
     if (onlineState.pendingRestart) {
-      return "正在发送重开申请……";
+      return "正在发送申请……";
     }
 
     if (hasThisPlayerVotedRestart()) {
-      return "已申请重开";
+      return "等待对方确认";
     }
 
-    return "申请重开";
+    return "再来一局";
   }
 
   function canVoteOnlineRestart() {
@@ -1702,7 +1763,7 @@
     }
 
     if (room.status === ONLINE_ROOM_STATUS.WAITING) {
-      return "等待对手";
+      return "等待对方加入";
     }
 
     if (room.status === ONLINE_ROOM_STATUS.ABANDONED) {
@@ -1718,7 +1779,7 @@
 
   function getOpponentStatusText(opponent) {
     if (!onlineState.room || onlineState.room.status === ONLINE_ROOM_STATUS.WAITING) {
-      return "等待对手.";
+      return "等待对方加入。";
     }
 
     if (!opponent) {
@@ -1855,7 +1916,7 @@
     }
 
     if (room.status === ONLINE_ROOM_STATUS.WAITING) {
-      return "等待中";
+      return "等待加入";
     }
 
     if (room.status === ONLINE_ROOM_STATUS.ABANDONED) {
@@ -1867,11 +1928,11 @@
     }
 
     if (gameState.winner) {
-      return `${getRoleDisplayName(gameState.winner)} wins`;
+      return `${getRoleDisplayName(gameState.winner)}胜`;
     }
 
     if (!onlineState.session) {
-      return `${getRoleDisplayName(gameState.currentPlayer)} turn`;
+      return `${getRoleDisplayName(gameState.currentPlayer)}回合`;
     }
 
     return onlineState.session.role === gameState.currentPlayer ? "轮到你了" : "对手回合";
@@ -1885,7 +1946,7 @@
     }
 
     if (room.status === ONLINE_ROOM_STATUS.WAITING) {
-      return "等待对手";
+      return "等待对方加入";
     }
 
     if (room.status === ONLINE_ROOM_STATUS.ABANDONED) {
@@ -1897,11 +1958,11 @@
     }
 
     if (gameState.winner) {
-      return `${getRoleDisplayName(gameState.winner)} wins`;
+      return `${getRoleDisplayName(gameState.winner)}胜`;
     }
 
     if (hasThisPlayerVotedRestart()) {
-      return "已申请重开. 等待对手.";
+      return "已申请再来一局，等待对方确认。";
     }
 
     if (onlineState.pendingMove) {

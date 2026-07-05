@@ -2,7 +2,7 @@
 
 A lightweight Gomoku game built with HTML, CSS and JavaScript.
 
-Current version: `v3.0.15`
+Current version: `v3.0.16`
 
 本版增加“房间没人了就删除”：玩家点击离开房间后，如果对方不在线或席位为空，Firebase 中对应房间会立即删除。
 
@@ -75,7 +75,7 @@ The AI is designed to feel reasonable, not unbeatable.
 
 ## Mobile Support
 
-GOMOKU v3.0.15 supports responsive mobile and tablet play:
+GOMOKU v3.0.16 supports responsive mobile and tablet play:
 
 - The board scales to the available viewport width.
 - Touch input resolves to the nearest board intersection.
@@ -159,6 +159,14 @@ Gomoku/
 
 This project is released under the MIT License. See [LICENSE](LICENSE) for details.
 
+
+## v3.0.16 update
+
+- 在线对局结束后，结果统一显示为“黑棋胜 / 白棋胜 / 平局”。
+- “再来一局”增加确认流程，双方确认后才重新开局。
+- 等待在线玩家加入时，状态文案统一为“等待对方加入”。
+- 手机端按钮、房间号输入框和在线操作区做了更适合触屏的圆角与尺寸优化。
+- 复制房间号后，按钮会临时显示“已复制 ✓”，并提示可发送给对方加入。
 
 ## v3.0.15 update
 
