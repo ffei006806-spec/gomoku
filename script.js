@@ -1,5 +1,5 @@
 /**
- * Gomoku v2.1.2.
+ * Gomoku v3.0.9.
  * 使用原生 JavaScript 管理页面导航、对局状态、弹窗、计时和音效。
  */
 (function bootstrapGomokuApp() {
@@ -10,6 +10,7 @@
   const EMPTY_CELL = null;
   const MODAL_TRANSITION_MS = 190;
   const MOVE_SOUND_VOLUME = 0.058;
+  const APP_VERSION = "v3.0.9";
   const COORDINATE_LABELS = Object.freeze("ABCDEFGHIJKLMNO".split(""));
 
   const PLAYERS = Object.freeze({
@@ -20,6 +21,14 @@
   const GAME_MODES = Object.freeze({
     LOCAL: "local",
     AI: "ai",
+    ONLINE: "online",
+  });
+
+  const ONLINE_ROOM_STATUS = Object.freeze({
+    WAITING: "waiting",
+    PLAYING: "playing",
+    FINISHED: "finished",
+    ABANDONED: "abandoned",
   });
 
   const AI_CONFIG = Object.freeze({
@@ -92,6 +101,17 @@
     enabled: true,
     context: null,
   };
+  const onlineState = {
+    session: null,
+    room: null,
+    unsubscribe: null,
+    pendingMove: false,
+    pendingRestart: false,
+    hasReceivedSnapshot: false,
+    lastSyncedMoveCount: 0,
+    lastResultKey: "",
+    lastAbandonedRoomId: "",
+  };
 
   let gameState = createInitialGameState();
   let activeScreen = "home";
@@ -115,6 +135,7 @@
     bindEvents();
     renderGame();
     showScreen("home");
+    restoreOnlineSessionIfAvailable();
   }
 
   /**
@@ -125,6 +146,12 @@
     elements.gameScreen = document.getElementById("gameScreen");
     elements.localGameButton = document.getElementById("localGameButton");
     elements.aiGameButton = document.getElementById("aiGameButton");
+    elements.onlineGameButton = document.getElementById("onlineGameButton");
+    elements.onlineEntry = document.getElementById("onlineEntry");
+    elements.roomCodeInput = document.getElementById("roomCodeInput");
+    elements.createRoomButton = document.getElementById("createRoomButton");
+    elements.joinRoomButton = document.getElementById("joinRoomButton");
+    elements.onlineHomeStatus = document.getElementById("onlineHomeStatus");
     elements.rulesButton = document.getElementById("rulesButton");
     elements.aboutButton = document.getElementById("aboutButton");
     elements.homeButton = document.getElementById("homeButton");
@@ -147,6 +174,14 @@
     elements.lastMove = document.getElementById("lastMove");
     elements.undoButton = document.getElementById("undoButton");
     elements.resetButton = document.getElementById("resetButton");
+    elements.undoButtonDefaultText = elements.undoButton.textContent;
+    elements.resetButtonDefaultText = elements.resetButton.textContent;
+    elements.onlineRoomCard = document.getElementById("onlineRoomCard");
+    elements.onlineRoomCode = document.getElementById("onlineRoomCode");
+    elements.onlineRoomMeta = document.getElementById("onlineRoomMeta");
+    elements.onlineOpponentStatus = document.getElementById("onlineOpponentStatus");
+    elements.copyRoomCodeButton = document.getElementById("copyRoomCodeButton");
+    elements.leaveRoomButton = document.getElementById("leaveRoomButton");
     elements.modal = document.getElementById("appModal");
     elements.modalKicker = document.getElementById("modalKicker");
     elements.modalTitle = document.getElementById("modalTitle");
@@ -247,6 +282,10 @@
   function bindEvents() {
     elements.localGameButton.addEventListener("click", handleStartLocalGame);
     elements.aiGameButton.addEventListener("click", handleStartAiGame);
+    elements.onlineGameButton.addEventListener("click", handleOpenOnlineEntry);
+    elements.createRoomButton.addEventListener("click", handleCreateOnlineRoom);
+    elements.joinRoomButton.addEventListener("click", handleJoinOnlineRoom);
+    elements.roomCodeInput.addEventListener("input", handleRoomCodeInput);
     elements.rulesButton.addEventListener("click", showRulesModal);
     elements.aboutButton.addEventListener("click", showAboutModal);
     elements.homeButton.addEventListener("click", handleHomeRequest);
@@ -255,6 +294,8 @@
     elements.board.addEventListener("contextmenu", preventBoardContextMenu);
     elements.undoButton.addEventListener("click", undoMove);
     elements.resetButton.addEventListener("click", requestRestart);
+    elements.copyRoomCodeButton.addEventListener("click", handleCopyRoomCode);
+    elements.leaveRoomButton.addEventListener("click", requestLeaveOnlineRoom);
     elements.modal.addEventListener("click", handleModalBackdropClick);
     window.addEventListener("keydown", handleWindowKeydown);
   }
@@ -293,6 +334,379 @@
     return board;
   }
 
+  function getRoomManager() {
+    if (!window.GomokuRoomManager) {
+      throw new Error("Online room manager is not available.");
+    }
+
+    return window.GomokuRoomManager;
+  }
+
+  function getOnlineController() {
+    if (!window.GomokuOnlineController) {
+      throw new Error("Online controller is not available.");
+    }
+
+    return window.GomokuOnlineController;
+  }
+
+  function handleOpenOnlineEntry() {
+    elements.onlineEntry.hidden = !elements.onlineEntry.hidden;
+    setOnlineHomeStatus(elements.onlineEntry.hidden ? "" : "Create a room or enter a room code to join.");
+
+    if (!elements.onlineEntry.hidden) {
+      elements.roomCodeInput.focus({ preventScroll: true });
+    }
+  }
+
+  function handleRoomCodeInput() {
+    elements.roomCodeInput.value = getOnlineController().normalizeRoomCode(elements.roomCodeInput.value);
+  }
+
+  async function handleCreateOnlineRoom() {
+    setOnlineBusy(true);
+    setOnlineHomeStatus("Creating room...");
+
+    try {
+      initializeAudioContext();
+      const session = await getRoomManager().createRoom();
+      setOnlineHomeStatus(`Room ${session.roomId} created.`);
+      enterOnlineSession(session);
+    } catch (error) {
+      setOnlineHomeStatus(getErrorMessage(error));
+    } finally {
+      setOnlineBusy(false);
+    }
+  }
+
+  async function handleJoinOnlineRoom() {
+    const controller = getOnlineController();
+    const roomCode = controller.normalizeRoomCode(elements.roomCodeInput.value);
+
+    if (!controller.isValidRoomCode(roomCode)) {
+      setOnlineHomeStatus("Enter a 5-8 character room code.");
+      return;
+    }
+
+    setOnlineBusy(true);
+    setOnlineHomeStatus("Joining room...");
+
+    try {
+      initializeAudioContext();
+      const session = await getRoomManager().joinRoom(roomCode);
+      setOnlineHomeStatus(`Joined room ${session.roomId}.`);
+      enterOnlineSession(session);
+    } catch (error) {
+      setOnlineHomeStatus(getErrorMessage(error));
+    } finally {
+      setOnlineBusy(false);
+    }
+  }
+
+  async function restoreOnlineSessionIfAvailable() {
+    if (!window.GomokuRoomManager || !window.GomokuRoomManager.getSession()) {
+      return;
+    }
+
+    elements.onlineEntry.hidden = false;
+    setOnlineHomeStatus("Reconnecting to online room...");
+
+    try {
+      const session = await getRoomManager().reconnectSession();
+
+      if (session) {
+        enterOnlineSession(session);
+      }
+    } catch (error) {
+      getRoomManager().clearSession();
+      setOnlineHomeStatus(getErrorMessage(error));
+    }
+  }
+
+  function setOnlineBusy(isBusy) {
+    getOnlineController().setBusy([
+      elements.onlineGameButton,
+      elements.createRoomButton,
+      elements.joinRoomButton,
+      elements.roomCodeInput,
+    ], isBusy);
+  }
+
+  function setOnlineHomeStatus(message) {
+    elements.onlineHomeStatus.textContent = message;
+  }
+
+  function enterOnlineSession(session) {
+    detachOnlineRoomListener();
+    cancelAiMove();
+    closeModal();
+
+    onlineState.session = {
+      roomId: session.roomId,
+      role: session.role,
+      clientId: session.clientId,
+    };
+    onlineState.room = session.room || null;
+    onlineState.pendingMove = false;
+    onlineState.pendingRestart = false;
+    onlineState.hasReceivedSnapshot = false;
+    onlineState.lastSyncedMoveCount = 0;
+    onlineState.lastResultKey = "";
+    onlineState.lastAbandonedRoomId = "";
+    gameState = createInitialGameState(GAME_MODES.ONLINE);
+
+    startTimer();
+    showScreen("game");
+    renderGame();
+
+    if (session.room) {
+      applyOnlineRoomSnapshot(session.room);
+    }
+
+    onlineState.unsubscribe = getRoomManager().watchRoom(
+      session.roomId,
+      applyOnlineRoomSnapshot,
+      handleOnlineRoomError,
+    );
+  }
+
+  function detachOnlineRoomListener() {
+    if (onlineState.unsubscribe) {
+      onlineState.unsubscribe();
+      onlineState.unsubscribe = null;
+    }
+  }
+
+  function handleOnlineRoomError(error) {
+    showOnlineNotice("Online connection error", getErrorMessage(error));
+  }
+
+  function getErrorMessage(error) {
+    return error && error.message ? error.message : "Something went wrong.";
+  }
+
+  function applyOnlineRoomSnapshot(room) {
+    if (!onlineState.session) {
+      return;
+    }
+
+    if (!room) {
+      detachOnlineRoomListener();
+      getRoomManager().clearSession();
+      resetOnlineState();
+      stopTimer();
+      showScreen("home");
+      showOnlineNotice("Room unavailable", "This online room no longer exists.");
+      return;
+    }
+
+    const previousMoveCount = onlineState.lastSyncedMoveCount;
+    const hadSnapshot = onlineState.hasReceivedSnapshot;
+    const moveHistory = normalizeOnlineMoveHistory(room.moveHistory);
+    const moveCount = moveHistory.length;
+
+    onlineState.room = room;
+    onlineState.hasReceivedSnapshot = true;
+    onlineState.lastSyncedMoveCount = moveCount;
+    gameState.mode = GAME_MODES.ONLINE;
+    gameState.board = normalizeOnlineBoard(room.board);
+    gameState.currentPlayer = room.currentPlayer === PLAYERS.WHITE ? PLAYERS.WHITE : PLAYERS.BLACK;
+    gameState.moveHistory = moveHistory;
+    gameState.lastMove = room.lastMove || null;
+    gameState.moveCount = moveCount;
+    gameState.winner = room.winner === PLAYERS.BLACK || room.winner === PLAYERS.WHITE ? room.winner : null;
+    gameState.isDraw = room.winner === "draw";
+    gameState.isGameOver = room.status === ONLINE_ROOM_STATUS.FINISHED || room.status === ONLINE_ROOM_STATUS.ABANDONED;
+    gameState.isAiThinking = false;
+
+    if (hadSnapshot && moveCount > previousMoveCount && activeScreen === "game") {
+      playSound("place");
+    }
+
+    if (gameState.isGameOver) {
+      stopTimer();
+    }
+
+    renderGame();
+    maybeShowOnlineResult(room);
+  }
+
+  function normalizeOnlineBoard(board) {
+    if (window.GomokuOnlineService) {
+      return window.GomokuOnlineService.normalizeBoard(board);
+    }
+
+    return createEmptyBoard();
+  }
+
+  function normalizeOnlineMoveHistory(moveHistory) {
+    if (window.GomokuOnlineService) {
+      return window.GomokuOnlineService.normalizeMoveHistory(moveHistory);
+    }
+
+    return [];
+  }
+
+  function maybeShowOnlineResult(room) {
+    const resultKey = `${room.roomId}:${room.status}:${room.winner || ""}:${gameState.moveCount}`;
+
+    if (room.status === ONLINE_ROOM_STATUS.FINISHED && onlineState.lastResultKey !== resultKey) {
+      onlineState.lastResultKey = resultKey;
+      showOnlineFinishedModal(room);
+      return;
+    }
+
+    if (room.status === ONLINE_ROOM_STATUS.ABANDONED && onlineState.lastAbandonedRoomId !== room.roomId) {
+      onlineState.lastAbandonedRoomId = room.roomId;
+      showOnlineNotice("Room abandoned", "A player left the room. This online game has ended.");
+    }
+  }
+
+  function showOnlineFinishedModal(room) {
+    const title = room.winner === "draw" ? "Draw" : `${getRoleDisplayName(room.winner)} wins`;
+
+    openModal({
+      type: MODAL_TYPES.RESULT,
+      kicker: "Online Game Finished",
+      title,
+      body: ["Both players can vote to restart the room."],
+      actions: [
+        { label: "View Board", style: "secondary", handler: closeModal },
+        { label: "Restart Vote", style: "primary", handler: requestOnlineRestart },
+      ],
+    });
+  }
+
+  function showOnlineNotice(title, message) {
+    openModal({
+      type: MODAL_TYPES.INFO,
+      kicker: "Online Multiplayer",
+      title,
+      body: [message],
+      actions: [{ label: "OK", style: "primary", handler: closeModal }],
+    });
+  }
+
+  function resetOnlineState() {
+    onlineState.session = null;
+    onlineState.room = null;
+    onlineState.pendingMove = false;
+    onlineState.pendingRestart = false;
+    onlineState.hasReceivedSnapshot = false;
+    onlineState.lastSyncedMoveCount = 0;
+    onlineState.lastResultKey = "";
+    onlineState.lastAbandonedRoomId = "";
+  }
+
+  async function handleOnlineBoardMove(row, col) {
+    if (!canSubmitOnlineMove(row, col)) {
+      renderGame();
+      return;
+    }
+
+    onlineState.pendingMove = true;
+    renderGame();
+
+    try {
+      await getRoomManager().placeMove(onlineState.session, row, col);
+    } catch (error) {
+      showOnlineNotice("Move not accepted", getErrorMessage(error));
+    } finally {
+      onlineState.pendingMove = false;
+      renderGame();
+    }
+  }
+
+  function canSubmitOnlineMove(row, col) {
+    if (!onlineState.session || !onlineState.room) {
+      return false;
+    }
+
+    if (onlineState.pendingMove || gameState.isGameOver) {
+      return false;
+    }
+
+    if (onlineState.room.status !== ONLINE_ROOM_STATUS.PLAYING) {
+      return false;
+    }
+
+    if (onlineState.session.role !== gameState.currentPlayer) {
+      return false;
+    }
+
+    return isValidMove(row, col);
+  }
+
+  async function requestOnlineRestart() {
+    if (!onlineState.session || onlineState.pendingRestart) {
+      return;
+    }
+
+    onlineState.pendingRestart = true;
+    closeModal();
+    renderGame();
+
+    try {
+      await getRoomManager().voteRestart(onlineState.session);
+    } catch (error) {
+      showOnlineNotice("Restart unavailable", getErrorMessage(error));
+    } finally {
+      onlineState.pendingRestart = false;
+      renderGame();
+    }
+  }
+
+  async function handleCopyRoomCode() {
+    if (!onlineState.session) {
+      return;
+    }
+
+    try {
+      const copied = await getOnlineController().copyText(onlineState.session.roomId);
+      elements.onlineOpponentStatus.textContent = copied ? "Room code copied." : "Copy is not available in this browser.";
+    } catch (error) {
+      elements.onlineOpponentStatus.textContent = getErrorMessage(error);
+    }
+  }
+
+  function requestLeaveOnlineRoom() {
+    if (!onlineState.session) {
+      confirmGoHome();
+      return;
+    }
+
+    openModal({
+      type: MODAL_TYPES.CONFIRM,
+      kicker: "Leave Room",
+      title: "Leave this online room?",
+      body: ["The room will be marked abandoned only because you are leaving on purpose."],
+      actions: [
+        { label: "Stay", style: "secondary", handler: closeModal },
+        { label: "Leave Room", style: "primary", handler: confirmLeaveOnlineRoom },
+      ],
+    });
+  }
+
+  async function confirmLeaveOnlineRoom() {
+    const session = onlineState.session;
+
+    closeModal();
+    detachOnlineRoomListener();
+    stopTimer();
+
+    try {
+      await getRoomManager().leaveSession(session);
+    } catch (error) {
+      getRoomManager().clearSession();
+    }
+
+    resetOnlineState();
+    gameState = createInitialGameState(GAME_MODES.LOCAL);
+    renderGame();
+    showScreen("home");
+    setOnlineHomeStatus("Left online room.");
+  }
+
   /**
    * 首页开始按钮入口。
    */
@@ -315,6 +729,11 @@
    * 处理返回首页请求，避免误丢正在进行的对局。
    */
   function handleHomeRequest() {
+    if (gameState.mode === GAME_MODES.ONLINE && onlineState.session) {
+      requestLeaveOnlineRoom();
+      return;
+    }
+
     if (hasActiveMatch()) {
       openModal({
         type: MODAL_TYPES.CONFIRM,
@@ -385,6 +804,11 @@
     const movePoint = getMovePointFromEvent(event);
 
     if (!movePoint || !isValidMove(movePoint.row, movePoint.col)) {
+      return;
+    }
+
+    if (gameState.mode === GAME_MODES.ONLINE) {
+      handleOnlineBoardMove(movePoint.row, movePoint.col);
       return;
     }
 
@@ -505,6 +929,11 @@
    * 悔棋一步，恢复到上一位玩家的回合。
    */
   function undoMove() {
+    if (gameState.mode === GAME_MODES.ONLINE) {
+      showOnlineNotice("Undo unavailable", "Online mode does not support undo yet.");
+      return;
+    }
+
     if (gameState.moveHistory.length === 0 || gameState.isGameOver) {
       return;
     }
@@ -561,7 +990,23 @@
    * @returns {boolean} 是否锁定人工输入。
    */
   function isHumanInputLocked() {
+    if (gameState.mode === GAME_MODES.ONLINE) {
+      return isOnlineInputLocked();
+    }
+
     return gameState.isAiThinking || (gameState.mode === GAME_MODES.AI && gameState.currentPlayer === AI_CONFIG.player);
+  }
+
+  function isOnlineInputLocked() {
+    if (!onlineState.session || !onlineState.room || onlineState.pendingMove) {
+      return true;
+    }
+
+    if (onlineState.room.status !== ONLINE_ROOM_STATUS.PLAYING || gameState.isGameOver) {
+      return true;
+    }
+
+    return onlineState.session.role !== gameState.currentPlayer;
   }
 
   /**
@@ -936,6 +1381,11 @@
    * 打开重新开始确认弹窗。
    */
   function requestRestart() {
+    if (gameState.mode === GAME_MODES.ONLINE) {
+      requestOnlineRestart();
+      return;
+    }
+
     openModal({
       type: MODAL_TYPES.CONFIRM,
       kicker: "重新开始",
@@ -952,6 +1402,11 @@
    * 保留当前模式重新开始一局。
    */
   function restartCurrentMode() {
+    if (gameState.mode === GAME_MODES.ONLINE) {
+      requestOnlineRestart();
+      return;
+    }
+
     startNewMatch(gameState.mode || GAME_MODES.LOCAL);
   }
 
@@ -1094,8 +1549,8 @@
     logo.className = "product-logo";
     stones.className = "logo-stones";
     logoWord.textContent = "GOMOKU";
-    version.textContent = "Version 2.0.0";
-    description.textContent = "A lightweight Gomoku game with local two-player and AI modes.";
+    version.textContent = "Version 3.0.9";
+    description.textContent = "A lightweight Gomoku game with local, AI, and online two-player modes.";
     creator.textContent = "Created by Binbin.";
     collaboration.textContent = "Built with AI collaboration.";
 
@@ -1130,6 +1585,7 @@
     elements.board.classList.toggle("is-black-turn", gameState.currentPlayer === PLAYERS.BLACK && !gameState.isGameOver);
     elements.board.classList.toggle("is-white-turn", gameState.currentPlayer === PLAYERS.WHITE && !gameState.isGameOver);
     elements.board.classList.toggle("game-over", gameState.isGameOver);
+    elements.board.classList.toggle("is-input-locked", isHumanInputLocked());
 
     for (let index = 0; index < cells.length; index += 1) {
       const cell = cells[index];
@@ -1170,7 +1626,103 @@
     elements.sideMoveCount.textContent = String(gameState.moveCount);
     elements.lastMove.textContent = getLastMoveText();
     elements.gameStatus.textContent = getGameStatusText();
+    renderOnlineRoomState();
+
+    if (gameState.mode === GAME_MODES.ONLINE) {
+      elements.undoButton.disabled = false;
+      elements.undoButton.textContent = "Undo";
+      elements.resetButton.textContent = getOnlineRestartButtonText();
+      elements.resetButton.disabled = !onlineState.session || onlineState.pendingRestart || !canVoteOnlineRestart() || hasThisPlayerVotedRestart();
+      return;
+    }
+
     elements.undoButton.disabled = gameState.moveHistory.length === 0 || gameState.isGameOver;
+    elements.undoButton.textContent = elements.undoButtonDefaultText;
+    elements.resetButton.textContent = elements.resetButtonDefaultText;
+    elements.resetButton.disabled = false;
+  }
+
+  function renderOnlineRoomState() {
+    const isOnlineMode = gameState.mode === GAME_MODES.ONLINE && onlineState.session;
+
+    elements.onlineRoomCard.hidden = !isOnlineMode;
+
+    if (!isOnlineMode) {
+      return;
+    }
+
+    const room = onlineState.room;
+    const role = onlineState.session.role;
+    const opponentRole = getNextPlayer(role);
+    const opponent = room && room.players ? room.players[opponentRole] : null;
+
+    elements.onlineRoomCode.textContent = onlineState.session.roomId;
+    elements.onlineRoomMeta.textContent = `${getRoleDisplayName(role)} · ${getOnlineRoomStatusText(room)}`;
+    elements.onlineOpponentStatus.textContent = getOpponentStatusText(opponent);
+  }
+
+  function getOnlineRestartButtonText() {
+    if (onlineState.pendingRestart) {
+      return "Sending vote...";
+    }
+
+    if (hasThisPlayerVotedRestart()) {
+      return "Restart requested";
+    }
+
+    return "Restart Vote";
+  }
+
+  function canVoteOnlineRestart() {
+    return Boolean(
+      onlineState.room &&
+      onlineState.room.status !== ONLINE_ROOM_STATUS.WAITING &&
+      onlineState.room.status !== ONLINE_ROOM_STATUS.ABANDONED,
+    );
+  }
+
+  function hasThisPlayerVotedRestart() {
+    if (!onlineState.room || !onlineState.room.restartVotes || !onlineState.session) {
+      return false;
+    }
+
+    return Boolean(onlineState.room.restartVotes[onlineState.session.role]);
+  }
+
+  function getOnlineRoomStatusText(room) {
+    if (!room) {
+      return "Connecting";
+    }
+
+    if (room.status === ONLINE_ROOM_STATUS.WAITING) {
+      return "Waiting for opponent";
+    }
+
+    if (room.status === ONLINE_ROOM_STATUS.ABANDONED) {
+      return "Abandoned";
+    }
+
+    if (room.status === ONLINE_ROOM_STATUS.FINISHED) {
+      return "Finished";
+    }
+
+    return "Playing";
+  }
+
+  function getOpponentStatusText(opponent) {
+    if (!onlineState.room || onlineState.room.status === ONLINE_ROOM_STATUS.WAITING) {
+      return "Waiting for opponent.";
+    }
+
+    if (!opponent) {
+      return "Opponent slot is empty.";
+    }
+
+    return opponent.online ? "Opponent online." : "Opponent offline. Waiting for reconnect.";
+  }
+
+  function getRoleDisplayName(role) {
+    return role === PLAYERS.BLACK ? "Black" : "White";
   }
 
   /**
@@ -1229,6 +1781,10 @@
    * @returns {string} 当前回合文案。
    */
   function getTurnDisplayText() {
+    if (gameState.mode === GAME_MODES.ONLINE) {
+      return getOnlineTurnDisplayText();
+    }
+
     if (gameState.winner) {
       return PLAYER_META[gameState.winner].winText;
     }
@@ -1249,7 +1805,11 @@
    * @returns {string} 模式文案。
    */
   function getModeLabelText() {
-    return gameState.mode === GAME_MODES.AI ? "v2.1.2 · Play with AI" : "v2.1.2 · Local Two Player";
+    if (gameState.mode === GAME_MODES.ONLINE) {
+      return onlineState.session ? `${APP_VERSION} · Online Room ${onlineState.session.roomId}` : `${APP_VERSION} · Online Multiplayer`;
+    }
+
+    return gameState.mode === GAME_MODES.AI ? `${APP_VERSION} · Play with AI` : `${APP_VERSION} · Local Two Player`;
   }
 
   /**
@@ -1257,6 +1817,10 @@
    * @returns {string} 状态文案。
    */
   function getGameStatusText() {
+    if (gameState.mode === GAME_MODES.ONLINE) {
+      return getOnlineGameStatusText();
+    }
+
     if (gameState.winner) {
       return `${PLAYER_META[gameState.winner].name}获胜`;
     }
@@ -1274,6 +1838,83 @@
     }
 
     return "对局进行中";
+  }
+
+  function getOnlineTurnDisplayText() {
+    const room = onlineState.room;
+
+    if (!room) {
+      return "Connecting";
+    }
+
+    if (room.status === ONLINE_ROOM_STATUS.WAITING) {
+      return "Waiting";
+    }
+
+    if (room.status === ONLINE_ROOM_STATUS.ABANDONED) {
+      return "Abandoned";
+    }
+
+    if (gameState.isDraw) {
+      return "Draw";
+    }
+
+    if (gameState.winner) {
+      return `${getRoleDisplayName(gameState.winner)} wins`;
+    }
+
+    if (!onlineState.session) {
+      return `${getRoleDisplayName(gameState.currentPlayer)} turn`;
+    }
+
+    return onlineState.session.role === gameState.currentPlayer ? "Your turn" : "Opponent turn";
+  }
+
+  function getOnlineGameStatusText() {
+    const room = onlineState.room;
+
+    if (!room) {
+      return "Connecting to room";
+    }
+
+    if (room.status === ONLINE_ROOM_STATUS.WAITING) {
+      return "Waiting for opponent";
+    }
+
+    if (room.status === ONLINE_ROOM_STATUS.ABANDONED) {
+      return "Room abandoned";
+    }
+
+    if (gameState.isDraw) {
+      return "Draw";
+    }
+
+    if (gameState.winner) {
+      return `${getRoleDisplayName(gameState.winner)} wins`;
+    }
+
+    if (hasThisPlayerVotedRestart()) {
+      return "Restart requested. Waiting for opponent.";
+    }
+
+    if (onlineState.pendingMove) {
+      return "Sending move";
+    }
+
+    if (isOpponentOffline()) {
+      return "Opponent offline. Waiting for reconnect.";
+    }
+
+    return onlineState.session && onlineState.session.role === gameState.currentPlayer ? "Your turn" : "Opponent turn";
+  }
+
+  function isOpponentOffline() {
+    if (!onlineState.session || !onlineState.room || !onlineState.room.players) {
+      return false;
+    }
+
+    const opponent = onlineState.room.players[getNextPlayer(onlineState.session.role)];
+    return Boolean(opponent && !opponent.online && onlineState.room.status === ONLINE_ROOM_STATUS.PLAYING);
   }
 
   /**

@@ -1,6 +1,6 @@
 # Versioning Strategy
 
-The first release candidate is preserved as `v1.0.0-rc`. The current development target is `v2.1.2`.
+The first release candidate is preserved as `v1.0.0-rc`. The current development target is `v3.0.9`.
 
 ## Version Names
 
@@ -34,7 +34,7 @@ v1.0.0-rc
 Current version:
 
 ```text
-v2.1.2
+v3.0.9
 ```
 
 ## Release Candidate Rule
@@ -49,6 +49,8 @@ Before any new development begins:
 4. Run checks before marking a new version.
 
 For v2.1.0 development, a pre-development backup was created in `backups/Gomoku-v2.0.0-before-mobile-adaptation.zip`.
+
+For v3.0.9 development, a pre-development backup was created in `backups/Gomoku_v2.1.2_before_v3.0.9.zip`.
 
 ## Local Backup Zip Rule
 

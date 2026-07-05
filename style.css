@@ -498,7 +498,7 @@ h1 {
   box-shadow: var(--stone-white-shadow);
 }
 
-.board:not(.game-over).is-black-turn .cell.is-empty:hover .stone {
+.board:not(.game-over):not(.is-input-locked).is-black-turn .cell.is-empty:hover .stone {
   opacity: 0.42;
   transform: scale(0.9);
   background: var(--stone-black-fill);
@@ -507,13 +507,20 @@ h1 {
     0 0 0 1px rgba(0, 0, 0, 0.65);
 }
 
-.board:not(.game-over).is-white-turn .cell.is-empty:hover .stone {
+.board:not(.game-over):not(.is-input-locked).is-white-turn .cell.is-empty:hover .stone {
   opacity: 0.7;
   transform: scale(0.9);
   background: var(--stone-white-fill);
   box-shadow:
     0 4px 7px rgba(27, 17, 9, 0.14),
     0 0 0 1px rgba(99, 86, 70, 0.32);
+}
+
+.board.is-input-locked .cell.is-empty:hover .stone,
+.board.game-over .cell.is-empty:hover .stone {
+  opacity: 0;
+  transform: scale(0);
+  box-shadow: none;
 }
 
 .cell.is-last::after {
@@ -547,6 +554,97 @@ h1 {
     opacity: 1;
     transform: translate(-50%, -50%) scale(0.92);
   }
+}
+
+.online-entry {
+  max-width: 500px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.online-entry[hidden] {
+  display: none;
+}
+
+.online-room-field {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.online-room-field label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.online-room-field input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(39, 95, 67, 0.22);
+  border-radius: 8px;
+  padding: 0 14px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.92);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.online-room-field input:focus {
+  outline: 3px solid rgba(39, 95, 67, 0.18);
+  border-color: rgba(39, 95, 67, 0.42);
+}
+
+.online-entry-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.online-entry-status {
+  min-height: 1.4em;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.online-room-card {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.online-room-card[hidden] {
+  display: none;
+}
+
+.online-room-card strong {
+  display: block;
+  color: var(--ink);
+  font-size: 1.65rem;
+  letter-spacing: 0.08em;
+}
+
+.online-room-card p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.online-room-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .side-panel {
@@ -1111,7 +1209,7 @@ button:disabled {
   .board {
     --board-padding: clamp(16px, 5.4vw, 22px);
     --hit-size: clamp(30px, 8.5vw, 40px);
-    --stone-size: clamp(15px, 4.45vw, 18px);
+    --stone-size: clamp(18px, 5.2vw, 22px);
   }
 
   .grid-line.is-vertical {
@@ -1206,7 +1304,7 @@ button:disabled {
   .board {
     --board-padding: clamp(14px, 5vw, 19px);
     --hit-size: clamp(30px, 9vw, 34px);
-    --stone-size: clamp(14px, 4.25vw, 16px);
+    --stone-size: clamp(17px, 5.0vw, 20px);
   }
 
   .match-stat p,
@@ -1221,7 +1319,7 @@ button:disabled {
 
 @media (max-height: 560px) and (pointer: coarse) {
   .board {
-    --stone-size: clamp(11px, 3svh, 13px);
+    --stone-size: clamp(15px, 4svh, 18px);
   }
 
   .cell.is-last::after {
@@ -1239,7 +1337,7 @@ button:disabled {
   }
 
   .board:not(.game-over).is-black-turn .cell.is-empty:hover .stone,
-  .board:not(.game-over).is-white-turn .cell.is-empty:hover .stone {
+  .board:not(.game-over):not(.is-input-locked).is-white-turn .cell.is-empty:hover .stone {
     opacity: 0;
   }
 }

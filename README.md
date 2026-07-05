@@ -2,7 +2,7 @@
 
 A lightweight Gomoku game built with HTML, CSS and JavaScript.
 
-Current version: `v2.1.2`
+Current version: `v3.0.9`
 
 Created by Binbin. Built with AI collaboration.
 
@@ -14,6 +14,7 @@ Created by Binbin. Built with AI collaboration.
 
 - Local Two Player mode
 - Play with AI mode
+- Online Multiplayer mode with room codes
 - Player is black and moves first in AI mode
 - AI plays white with a short thinking delay
 - 15 x 15 Gomoku board with accurate intersection-based placement
@@ -21,13 +22,14 @@ Created by Binbin. Built with AI collaboration.
 - Desktop hover preview before placing a stone
 - Mobile and tablet touch-optimized board input
 - Animated last-move highlight
-- Undo
+- Undo for local and AI modes
+- Online restart voting
 - Restart confirmation dialog
 - Winner and draw dialogs without `alert`
 - Local Web Audio sound effects with a sound toggle
 - Top match bar with wins, moves, timer, and current turn
 - Responsive layout for desktop, tablet, and mobile
-- Offline-first static project with no CDN and no external runtime dependency
+- Static GitHub Pages friendly project with Firebase Realtime Database for online play
 
 ## Game Modes
 
@@ -38,6 +40,23 @@ Two players take turns on the same device. Black moves first. Undo removes one m
 ### Play with AI
 
 The human player is black and moves first. The AI is white and moves after a 300-600 ms thinking delay. Undo removes the latest AI move and the latest human move. If only one human move exists, undo removes that single move.
+
+### Online Multiplayer
+
+Online Multiplayer uses Firebase Realtime Database and simple room codes. There is no account system, lobby, chat, leaderboard, or spectator mode.
+
+1. Choose `Online Multiplayer`.
+2. Select `Create Room` to become black, or enter a room code and select `Join Room` to become white.
+3. Share the room code with the second player.
+4. When both players are connected, the game starts automatically.
+
+Online mode does not support undo yet. Restart requires both players to vote. Refreshing the page reconnects to the current room when the same browser still has its local session.
+
+Firebase database:
+
+```text
+https://binbinlab-gomoku-default-rtdb.asia-southeast1.firebasedatabase.app
+```
 
 ## AI Strategy
 
@@ -54,7 +73,7 @@ The AI is designed to feel reasonable, not unbeatable.
 
 ## Mobile Support
 
-GOMOKU v2.1.2 supports responsive mobile and tablet play:
+GOMOKU v3.0.9 supports responsive mobile and tablet play:
 
 - The board scales to the available viewport width.
 - Touch input resolves to the nearest board intersection.
@@ -71,7 +90,7 @@ Test targets:
 - Android: Chrome and Edge
 - Tablet: iPad Safari and Android tablet browsers
 
-The project uses standard HTML5, CSS3, and ES6 JavaScript only. It does not require a build step, a package manager, a CDN, or a network connection.
+The project uses standard HTML5, CSS3, and ES6 JavaScript. Local and AI modes work as static files. Online Multiplayer requires network access to the official Firebase SDK and the configured Firebase Realtime Database.
 
 ## Run Locally
 
@@ -90,6 +109,8 @@ Recommended options:
 3. Use desktop browser device emulation for a quick layout check.
 
 When testing on a phone, check portrait and landscape orientation, Local Two Player, Play with AI, undo, restart, winner dialog, sound toggle, and edge/corner board taps.
+
+For Online Multiplayer, test two browsers or devices against the deployed GitHub Pages URL so Firebase SDK loading, room creation, joining, reconnect, and onDisconnect behavior match the production environment.
 
 ## GitHub Pages Deployment
 
@@ -115,6 +136,10 @@ Gomoku/
 |-- index.html
 |-- style.css
 |-- script.js
+|-- firebase-config.js
+|-- online-service.js
+|-- room-manager.js
+|-- online-controller.js
 |-- CHANGELOG.md
 |-- README.md
 `-- LICENSE
@@ -125,7 +150,8 @@ Gomoku/
 - Stronger AI difficulty levels
 - Optional move record export
 - Accessibility refinements
-- Online play in a future major version
+- Stronger online security rules or Firebase Anonymous Auth
+- Optional online room cleanup
 
 ## License
 
