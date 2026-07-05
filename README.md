@@ -2,7 +2,7 @@
 
 A lightweight Gomoku game built with HTML, CSS and JavaScript.
 
-Current version: `v3.0.14`
+Current version: `v3.0.15`
 
 本版增加“房间没人了就删除”：玩家点击离开房间后，如果对方不在线或席位为空，Firebase 中对应房间会立即删除。
 
@@ -75,7 +75,7 @@ The AI is designed to feel reasonable, not unbeatable.
 
 ## Mobile Support
 
-GOMOKU v3.0.14 supports responsive mobile and tablet play:
+GOMOKU v3.0.15 supports responsive mobile and tablet play:
 
 - The board scales to the available viewport width.
 - Touch input resolves to the nearest board intersection.
@@ -158,3 +158,8 @@ Gomoku/
 ## License
 
 This project is released under the MIT License. See [LICENSE](LICENSE) for details.
+
+
+## v3.0.15 update
+
+Adds `version.json` plus an automatic version check so GitHub Pages users can keep the original URL while the page refreshes itself after a new deployment.

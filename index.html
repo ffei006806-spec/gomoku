@@ -3,16 +3,64 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>GOMOKU v3.0.14</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>GOMOKU v3.0.15</title>
+  <script>
+    window.GOMOKU_APP_VERSION = "v3.0.15";
+    (function () {
+      var CURRENT_VERSION = window.GOMOKU_APP_VERSION;
+      var VERSION_FILE = "version.json";
+      var RELOAD_FLAG = "gomoku_auto_reload_version";
+      function normalizeVersion(value) {
+        return String(value || "").trim();
+      }
+      function shouldCheckVersion() {
+        return window.location.protocol === "http:" || window.location.protocol === "https:";
+      }
+      if (!shouldCheckVersion() || !window.fetch) {
+        return;
+      }
+      fetch(VERSION_FILE + "?t=" + Date.now(), {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" }
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            return null;
+          }
+          return response.json();
+        })
+        .then(function (data) {
+          var latestVersion = normalizeVersion(data && data.version);
+          var currentVersion = normalizeVersion(CURRENT_VERSION);
+          if (!latestVersion || latestVersion === currentVersion) {
+            try { sessionStorage.removeItem(RELOAD_FLAG); } catch (error) {}
+            return;
+          }
+          var reloadedFor = "";
+          try { reloadedFor = sessionStorage.getItem(RELOAD_FLAG) || ""; } catch (error) {}
+          if (reloadedFor === latestVersion) {
+            return;
+          }
+          try { sessionStorage.setItem(RELOAD_FLAG, latestVersion); } catch (error) {}
+          window.location.reload();
+        })
+        .catch(function () {
+          // Version checking is a convenience feature; the game should still run if it fails.
+        });
+    })();
+  </script>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-  <link rel="stylesheet" href="style.css?v=3.0.13">
+  <link rel="stylesheet" href="style.css?v=3.0.15">
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js" defer></script>
-  <script src="firebase-config.js?v=3.0.13" defer></script>
-  <script src="online-service.js?v=3.0.13" defer></script>
-  <script src="room-manager.js?v=3.0.13" defer></script>
-  <script src="online-controller.js?v=3.0.13" defer></script>
-  <script src="script.js?v=3.0.13" defer></script>
+  <script src="firebase-config.js?v=3.0.15" defer></script>
+  <script src="online-service.js?v=3.0.15" defer></script>
+  <script src="room-manager.js?v=3.0.15" defer></script>
+  <script src="online-controller.js?v=3.0.15" defer></script>
+  <script src="script.js?v=3.0.15" defer></script>
 </head>
 <body>
   <main class="app" id="app">
@@ -25,7 +73,7 @@
           </span>
           <span class="logo-word">GOMOKU</span>
         </div>
-        <p class="eyebrow">版本 v3.0.14</p>
+        <p class="eyebrow">版本 v3.0.15</p>
         <h1 id="homeTitle">GOMOKU</h1>
         <p class="home-summary">支持本地双人、AI 对战和在线联机的五子棋游戏。</p>
 
@@ -70,7 +118,7 @@
             </span>
             <span class="logo-word">GOMOKU</span>
           </div>
-          <p class="eyebrow" id="modeLabel">版本 v3.0.14</p>
+          <p class="eyebrow" id="modeLabel">版本 v3.0.15</p>
         </div>
         <button class="sound-toggle is-on" id="soundToggleButton" type="button" aria-pressed="true">声音 开</button>
       </header>
