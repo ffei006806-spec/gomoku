@@ -1,5 +1,5 @@
 /**
- * Gomoku v3.0.9 Firebase Realtime Database service.
+ * Gomoku v3.0.12 Firebase Realtime Database service.
  */
 (function createGomokuOnlineService(global) {
   "use strict";
@@ -384,27 +384,39 @@
 
   async function leaveRoom(roomId, role, clientId) {
     const normalizedRole = normalizeRole(role);
+    const opponentRole = getNextPlayer(normalizedRole);
     const now = timestamp();
+
+    await getRoomRef(roomId).child(`players/${normalizedRole}`).onDisconnect().cancel();
 
     const result = await getRoomRef(roomId).transaction((room) => {
       if (!room) {
         return room;
       }
 
-      const player = room.players && room.players[normalizedRole];
+      if (!room.players) {
+        return null;
+      }
+
+      const player = room.players[normalizedRole];
 
       if (!player || player.clientId !== clientId) {
         return room;
       }
 
-      player.online = false;
-      player.lastSeen = now;
+      room.players[normalizedRole] = null;
+
+      const opponent = room.players[opponentRole];
+      const hasOpponentInRoom = Boolean(opponent && opponent.online);
+
+      if (!hasOpponentInRoom) {
+        return null;
+      }
+
       room.status = ROOM_STATUS.ABANDONED;
       room.updatedAt = now;
       return room;
     });
-
-    await getRoomRef(roomId).child(`players/${normalizedRole}`).onDisconnect().cancel();
 
     return result.snapshot.val();
   }

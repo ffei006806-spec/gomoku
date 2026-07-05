@@ -1,5 +1,5 @@
 /**
- * Gomoku v3.0.9 Firebase configuration.
+ * Gomoku v3.0.12 Firebase configuration.
  * Uses the official Firebase browser SDK loaded from gstatic in index.html.
  */
 (function configureGomokuFirebase(global) {

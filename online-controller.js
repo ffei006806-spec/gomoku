@@ -1,5 +1,5 @@
 /**
- * Gomoku v3.0.9 small online UI helpers.
+ * Gomoku v3.0.12 small online UI helpers.
  */
 (function createGomokuOnlineController(global) {
   "use strict";

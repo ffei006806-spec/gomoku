@@ -1,5 +1,5 @@
 /**
- * Gomoku v3.0.9.
+ * Gomoku v3.0.14.
  * 使用原生 JavaScript 管理页面导航、对局状态、弹窗、计时和音效。
  */
 (function bootstrapGomokuApp() {
@@ -10,7 +10,7 @@
   const EMPTY_CELL = null;
   const MODAL_TRANSITION_MS = 190;
   const MOVE_SOUND_VOLUME = 0.058;
-  const APP_VERSION = "v3.0.9";
+  const APP_VERSION = "v3.0.14";
   const COORDINATE_LABELS = Object.freeze("ABCDEFGHIJKLMNO".split(""));
 
   const PLAYERS = Object.freeze({
@@ -110,7 +110,7 @@
     hasReceivedSnapshot: false,
     lastSyncedMoveCount: 0,
     lastResultKey: "",
-    lastAbandonedRoomId: "",
+    last已结束RoomId: "",
   };
 
   let gameState = createInitialGameState();
@@ -147,6 +147,7 @@
     elements.localGameButton = document.getElementById("localGameButton");
     elements.aiGameButton = document.getElementById("aiGameButton");
     elements.onlineGameButton = document.getElementById("onlineGameButton");
+    elements.showJoinRoomButton = document.getElementById("showJoinRoomButton");
     elements.onlineEntry = document.getElementById("onlineEntry");
     elements.roomCodeInput = document.getElementById("roomCodeInput");
     elements.createRoomButton = document.getElementById("createRoomButton");
@@ -282,12 +283,17 @@
   function bindEvents() {
     elements.localGameButton.addEventListener("click", handleStartLocalGame);
     elements.aiGameButton.addEventListener("click", handleStartAiGame);
-    elements.onlineGameButton.addEventListener("click", handleOpenOnlineEntry);
-    elements.createRoomButton.addEventListener("click", handleCreateOnlineRoom);
+    elements.onlineGameButton.addEventListener("click", handleCreateOnlineRoom);
+    if (elements.showJoinRoomButton) {
+      elements.showJoinRoomButton.addEventListener("click", handleOpenOnlineEntry);
+    }
+    if (elements.createRoomButton) {
+      elements.createRoomButton.addEventListener("click", handleCreateOnlineRoom);
+    }
     elements.joinRoomButton.addEventListener("click", handleJoinOnlineRoom);
     elements.roomCodeInput.addEventListener("input", handleRoomCodeInput);
-    elements.rulesButton.addEventListener("click", showRulesModal);
-    elements.aboutButton.addEventListener("click", showAboutModal);
+    elements.rulesButton.addEventListener("click", show规则说明Modal);
+    elements.aboutButton.addEventListener("click", show关于游戏Modal);
     elements.homeButton.addEventListener("click", handleHomeRequest);
     elements.soundToggleButton.addEventListener("click", toggleSound);
     elements.board.addEventListener("click", handleBoardClick);
@@ -314,7 +320,7 @@
       moveCount: 0,
       elapsedSeconds: 0,
       winner: null,
-      isDraw: false,
+      is平局: false,
       isGameOver: false,
       isAiThinking: false,
     };
@@ -336,7 +342,7 @@
 
   function getRoomManager() {
     if (!window.GomokuRoomManager) {
-      throw new Error("Online room manager is not available.");
+      throw new Error("在线房间管理器不可用。");
     }
 
     return window.GomokuRoomManager;
@@ -344,7 +350,7 @@
 
   function getOnlineController() {
     if (!window.GomokuOnlineController) {
-      throw new Error("Online controller is not available.");
+      throw new Error("在线控制器不可用。");
     }
 
     return window.GomokuOnlineController;
@@ -352,7 +358,7 @@
 
   function handleOpenOnlineEntry() {
     elements.onlineEntry.hidden = !elements.onlineEntry.hidden;
-    setOnlineHomeStatus(elements.onlineEntry.hidden ? "" : "Create a room or enter a room code to join.");
+    setOnlineHomeStatus(elements.onlineEntry.hidden ? "" : "输入房间号后加入。创建房间请直接点上方“创建房间”。");
 
     if (!elements.onlineEntry.hidden) {
       elements.roomCodeInput.focus({ preventScroll: true });
@@ -365,12 +371,12 @@
 
   async function handleCreateOnlineRoom() {
     setOnlineBusy(true);
-    setOnlineHomeStatus("Creating room...");
+    setOnlineHomeStatus("正在创建房间……");
 
     try {
       initializeAudioContext();
       const session = await getRoomManager().createRoom();
-      setOnlineHomeStatus(`Room ${session.roomId} created.`);
+      setOnlineHomeStatus(`房间 ${session.roomId} 已创建。`);
       enterOnlineSession(session);
     } catch (error) {
       setOnlineHomeStatus(getErrorMessage(error));
@@ -384,17 +390,17 @@
     const roomCode = controller.normalizeRoomCode(elements.roomCodeInput.value);
 
     if (!controller.isValidRoomCode(roomCode)) {
-      setOnlineHomeStatus("Enter a 5-8 character room code.");
+      setOnlineHomeStatus("请输入 5–8 位房间号。");
       return;
     }
 
     setOnlineBusy(true);
-    setOnlineHomeStatus("Joining room...");
+    setOnlineHomeStatus("正在加入房间……");
 
     try {
       initializeAudioContext();
       const session = await getRoomManager().joinRoom(roomCode);
-      setOnlineHomeStatus(`Joined room ${session.roomId}.`);
+      setOnlineHomeStatus(`已加入房间 ${session.roomId}。`);
       enterOnlineSession(session);
     } catch (error) {
       setOnlineHomeStatus(getErrorMessage(error));
@@ -409,7 +415,7 @@
     }
 
     elements.onlineEntry.hidden = false;
-    setOnlineHomeStatus("Reconnecting to online room...");
+    setOnlineHomeStatus("正在重连在线房间……");
 
     try {
       const session = await getRoomManager().reconnectSession();
@@ -426,6 +432,7 @@
   function setOnlineBusy(isBusy) {
     getOnlineController().setBusy([
       elements.onlineGameButton,
+      elements.showJoinRoomButton,
       elements.createRoomButton,
       elements.joinRoomButton,
       elements.roomCodeInput,
@@ -452,7 +459,7 @@
     onlineState.hasReceivedSnapshot = false;
     onlineState.lastSyncedMoveCount = 0;
     onlineState.lastResultKey = "";
-    onlineState.lastAbandonedRoomId = "";
+    onlineState.last已结束RoomId = "";
     gameState = createInitialGameState(GAME_MODES.ONLINE);
 
     startTimer();
@@ -478,11 +485,11 @@
   }
 
   function handleOnlineRoomError(error) {
-    showOnlineNotice("Online connection error", getErrorMessage(error));
+    showOnlineNotice("在线连接错误", getErrorMessage(error));
   }
 
   function getErrorMessage(error) {
-    return error && error.message ? error.message : "Something went wrong.";
+    return error && error.message ? error.message : "操作失败，请稍后再试。";
   }
 
   function applyOnlineRoomSnapshot(room) {
@@ -496,7 +503,7 @@
       resetOnlineState();
       stopTimer();
       showScreen("home");
-      showOnlineNotice("Room unavailable", "This online room no longer exists.");
+      showOnlineNotice("房间不可用", "这个在线房间已不存在。");
       return;
     }
 
@@ -515,7 +522,7 @@
     gameState.lastMove = room.lastMove || null;
     gameState.moveCount = moveCount;
     gameState.winner = room.winner === PLAYERS.BLACK || room.winner === PLAYERS.WHITE ? room.winner : null;
-    gameState.isDraw = room.winner === "draw";
+    gameState.is平局 = room.winner === "draw";
     gameState.isGameOver = room.status === ONLINE_ROOM_STATUS.FINISHED || room.status === ONLINE_ROOM_STATUS.ABANDONED;
     gameState.isAiThinking = false;
 
@@ -552,27 +559,27 @@
 
     if (room.status === ONLINE_ROOM_STATUS.FINISHED && onlineState.lastResultKey !== resultKey) {
       onlineState.lastResultKey = resultKey;
-      showOnlineFinishedModal(room);
+      showOnline已完成Modal(room);
       return;
     }
 
-    if (room.status === ONLINE_ROOM_STATUS.ABANDONED && onlineState.lastAbandonedRoomId !== room.roomId) {
-      onlineState.lastAbandonedRoomId = room.roomId;
-      showOnlineNotice("Room abandoned", "A player left the room. This online game has ended.");
+    if (room.status === ONLINE_ROOM_STATUS.ABANDONED && onlineState.last已结束RoomId !== room.roomId) {
+      onlineState.last已结束RoomId = room.roomId;
+      showOnlineNotice("房间已结束", "有玩家离开房间，本局在线对局已结束。");
     }
   }
 
-  function showOnlineFinishedModal(room) {
-    const title = room.winner === "draw" ? "Draw" : `${getRoleDisplayName(room.winner)} wins`;
+  function showOnline已完成Modal(room) {
+    const title = room.winner === "draw" ? "平局" : `${getRoleDisplayName(room.winner)}获胜`;
 
     openModal({
       type: MODAL_TYPES.RESULT,
-      kicker: "Online Game Finished",
+      kicker: "在线对局结束",
       title,
       body: ["Both players can vote to restart the room."],
       actions: [
-        { label: "View Board", style: "secondary", handler: closeModal },
-        { label: "Restart Vote", style: "primary", handler: requestOnlineRestart },
+        { label: "查看棋局", style: "secondary", handler: closeModal },
+        { label: "申请重开", style: "primary", handler: requestOnlineRestart },
       ],
     });
   }
@@ -580,10 +587,10 @@
   function showOnlineNotice(title, message) {
     openModal({
       type: MODAL_TYPES.INFO,
-      kicker: "Online Multiplayer",
+      kicker: "在线联机",
       title,
       body: [message],
-      actions: [{ label: "OK", style: "primary", handler: closeModal }],
+      actions: [{ label: "知道了", style: "primary", handler: closeModal }],
     });
   }
 
@@ -595,7 +602,7 @@
     onlineState.hasReceivedSnapshot = false;
     onlineState.lastSyncedMoveCount = 0;
     onlineState.lastResultKey = "";
-    onlineState.lastAbandonedRoomId = "";
+    onlineState.last已结束RoomId = "";
   }
 
   async function handleOnlineBoardMove(row, col) {
@@ -610,7 +617,7 @@
     try {
       await getRoomManager().placeMove(onlineState.session, row, col);
     } catch (error) {
-      showOnlineNotice("Move not accepted", getErrorMessage(error));
+      showOnlineNotice("落子失败", getErrorMessage(error));
     } finally {
       onlineState.pendingMove = false;
       renderGame();
@@ -649,7 +656,7 @@
     try {
       await getRoomManager().voteRestart(onlineState.session);
     } catch (error) {
-      showOnlineNotice("Restart unavailable", getErrorMessage(error));
+      showOnlineNotice("无法重新开始", getErrorMessage(error));
     } finally {
       onlineState.pendingRestart = false;
       renderGame();
@@ -663,7 +670,7 @@
 
     try {
       const copied = await getOnlineController().copyText(onlineState.session.roomId);
-      elements.onlineOpponentStatus.textContent = copied ? "Room code copied." : "Copy is not available in this browser.";
+      elements.onlineOpponentStatus.textContent = copied ? "房间号已复制。" : "当前浏览器不支持复制。";
     } catch (error) {
       elements.onlineOpponentStatus.textContent = getErrorMessage(error);
     }
@@ -677,12 +684,12 @@
 
     openModal({
       type: MODAL_TYPES.CONFIRM,
-      kicker: "Leave Room",
-      title: "Leave this online room?",
+      kicker: "离开房间",
+      title: "确定离开这个在线房间吗？",
       body: ["The room will be marked abandoned only because you are leaving on purpose."],
       actions: [
-        { label: "Stay", style: "secondary", handler: closeModal },
-        { label: "Leave Room", style: "primary", handler: confirmLeaveOnlineRoom },
+        { label: "继续对局", style: "secondary", handler: closeModal },
+        { label: "离开房间", style: "primary", handler: confirmLeaveOnlineRoom },
       ],
     });
   }
@@ -704,7 +711,7 @@
     gameState = createInitialGameState(GAME_MODES.LOCAL);
     renderGame();
     showScreen("home");
-    setOnlineHomeStatus("Left online room.");
+    setOnlineHomeStatus("已离开在线房间。");
   }
 
   /**
@@ -916,7 +923,7 @@
     }
 
     if (gameState.moveCount === BOARD_SIZE * BOARD_SIZE) {
-      finishWithDraw();
+      finishWith平局();
       return;
     }
 
@@ -930,7 +937,7 @@
    */
   function undoMove() {
     if (gameState.mode === GAME_MODES.ONLINE) {
-      showOnlineNotice("Undo unavailable", "Online mode does not support undo yet.");
+      showOnlineNotice("暂不支持悔棋", "在线模式暂不支持悔棋。");
       return;
     }
 
@@ -939,9 +946,9 @@
     }
 
     cancelAiMove();
-    undoRecentMoves(getUndoStepCount());
+    undoRecentMoves(get悔棋StepCount());
     gameState.lastMove = gameState.moveHistory[gameState.moveHistory.length - 1] || null;
-    gameState.currentPlayer = gameState.mode === GAME_MODES.AI ? PLAYERS.BLACK : getUndoTurnPlayer();
+    gameState.currentPlayer = gameState.mode === GAME_MODES.AI ? PLAYERS.BLACK : get悔棋TurnPlayer();
     gameState.isAiThinking = false;
     playSound("undo");
     renderGame();
@@ -951,7 +958,7 @@
    * 根据当前模式获取悔棋步数。
    * @returns {number} 需要撤销的步数。
    */
-  function getUndoStepCount() {
+  function get悔棋StepCount() {
     if (gameState.mode !== GAME_MODES.AI) {
       return 1;
     }
@@ -980,7 +987,7 @@
    * 本地双人悔棋后轮到被撤销的一方继续下。
    * @returns {string} 下一手玩家。
    */
-  function getUndoTurnPlayer() {
+  function get悔棋TurnPlayer() {
     const lastMove = gameState.moveHistory[gameState.moveHistory.length - 1];
     return lastMove ? getNextPlayer(lastMove.player) : PLAYERS.BLACK;
   }
@@ -1428,8 +1435,8 @@
   /**
    * 结束对局为平局。
    */
-  function finishWithDraw() {
-    gameState.isDraw = true;
+  function finishWith平局() {
+    gameState.is平局 = true;
     gameState.isGameOver = true;
     refreshElapsedTime();
     stopTimer();
@@ -1469,12 +1476,12 @@
   /**
    * 展示规则说明弹窗。
    */
-  function showRulesModal() {
+  function show规则说明Modal() {
     openModal({
       type: MODAL_TYPES.RULES,
-      kicker: "Rules",
+      kicker: "规则说明",
       title: "五子连珠即可获胜",
-      renderContent: renderRulesContent,
+      renderContent: render规则说明Content,
       actions: [{ label: "知道了", style: "primary", handler: closeModal }],
     });
   }
@@ -1482,20 +1489,20 @@
   /**
    * 展示项目信息弹窗。
    */
-  function showAboutModal() {
+  function show关于游戏Modal() {
     openModal({
       type: MODAL_TYPES.ABOUT,
-      kicker: "About",
+      kicker: "关于游戏",
       title: "GOMOKU",
-      renderContent: renderAboutContent,
+      renderContent: render关于游戏Content,
       actions: [{ label: "关闭", style: "primary", handler: closeModal }],
     });
   }
 
   /**
-   * 渲染 Rules 弹窗的小棋盘示意图和规则说明。
+   * 渲染 规则说明 弹窗的小棋盘示意图和规则说明。
    */
-  function renderRulesContent() {
+  function render规则说明Content() {
     const wrapper = document.createElement("div");
     const demoBoard = document.createElement("div");
     const caption = document.createElement("p");
@@ -1531,9 +1538,9 @@
   }
 
   /**
-   * 渲染 About 弹窗中的正式项目信息。
+   * 渲染 关于游戏 弹窗中的正式项目信息。
    */
-  function renderAboutContent() {
+  function render关于游戏Content() {
     const wrapper = document.createElement("div");
     const logo = document.createElement("div");
     const stones = document.createElement("span");
@@ -1549,10 +1556,10 @@
     logo.className = "product-logo";
     stones.className = "logo-stones";
     logoWord.textContent = "GOMOKU";
-    version.textContent = "Version 3.0.9";
-    description.textContent = "A lightweight Gomoku game with local, AI, and online two-player modes.";
-    creator.textContent = "Created by Binbin.";
-    collaboration.textContent = "Built with AI collaboration.";
+    version.textContent = "版本 3.0.13";
+    description.textContent = "支持本地双人、AI 对战和在线联机的五子棋游戏。";
+    creator.textContent = "Binbin 出品。";
+    collaboration.textContent = "由 AI 协作完成。";
 
     stones.setAttribute("aria-hidden", "true");
     stones.appendChild(blackStone);
@@ -1630,7 +1637,7 @@
 
     if (gameState.mode === GAME_MODES.ONLINE) {
       elements.undoButton.disabled = false;
-      elements.undoButton.textContent = "Undo";
+      elements.undoButton.textContent = "悔棋";
       elements.resetButton.textContent = getOnlineRestartButtonText();
       elements.resetButton.disabled = !onlineState.session || onlineState.pendingRestart || !canVoteOnlineRestart() || hasThisPlayerVotedRestart();
       return;
@@ -1663,14 +1670,14 @@
 
   function getOnlineRestartButtonText() {
     if (onlineState.pendingRestart) {
-      return "Sending vote...";
+      return "正在发送重开申请……";
     }
 
     if (hasThisPlayerVotedRestart()) {
-      return "Restart requested";
+      return "已申请重开";
     }
 
-    return "Restart Vote";
+    return "申请重开";
   }
 
   function canVoteOnlineRestart() {
@@ -1691,38 +1698,38 @@
 
   function getOnlineRoomStatusText(room) {
     if (!room) {
-      return "Connecting";
+      return "连接中";
     }
 
     if (room.status === ONLINE_ROOM_STATUS.WAITING) {
-      return "Waiting for opponent";
+      return "等待对手";
     }
 
     if (room.status === ONLINE_ROOM_STATUS.ABANDONED) {
-      return "Abandoned";
+      return "已结束";
     }
 
     if (room.status === ONLINE_ROOM_STATUS.FINISHED) {
-      return "Finished";
+      return "已完成";
     }
 
-    return "Playing";
+    return "对局中";
   }
 
   function getOpponentStatusText(opponent) {
     if (!onlineState.room || onlineState.room.status === ONLINE_ROOM_STATUS.WAITING) {
-      return "Waiting for opponent.";
+      return "等待对手.";
     }
 
     if (!opponent) {
-      return "Opponent slot is empty.";
+      return "对手位置为空。";
     }
 
-    return opponent.online ? "Opponent online." : "Opponent offline. Waiting for reconnect.";
+    return opponent.online ? "对手在线。" : "对手离线，等待重连。";
   }
 
   function getRoleDisplayName(role) {
-    return role === PLAYERS.BLACK ? "Black" : "White";
+    return role === PLAYERS.BLACK ? "黑棋" : "白棋";
   }
 
   /**
@@ -1789,7 +1796,7 @@
       return PLAYER_META[gameState.winner].winText;
     }
 
-    if (gameState.isDraw) {
+    if (gameState.is平局) {
       return "平局";
     }
 
@@ -1806,10 +1813,10 @@
    */
   function getModeLabelText() {
     if (gameState.mode === GAME_MODES.ONLINE) {
-      return onlineState.session ? `${APP_VERSION} · Online Room ${onlineState.session.roomId}` : `${APP_VERSION} · Online Multiplayer`;
+      return onlineState.session ? `${APP_VERSION} · 在线房间 ${onlineState.session.roomId}` : `${APP_VERSION} · 在线联机`;
     }
 
-    return gameState.mode === GAME_MODES.AI ? `${APP_VERSION} · Play with AI` : `${APP_VERSION} · Local Two Player`;
+    return gameState.mode === GAME_MODES.AI ? `${APP_VERSION} · 人机对战` : `${APP_VERSION} · 本地双人`;
   }
 
   /**
@@ -1825,7 +1832,7 @@
       return `${PLAYER_META[gameState.winner].name}获胜`;
     }
 
-    if (gameState.isDraw) {
+    if (gameState.is平局) {
       return "平局";
     }
 
@@ -1844,19 +1851,19 @@
     const room = onlineState.room;
 
     if (!room) {
-      return "Connecting";
+      return "连接中";
     }
 
     if (room.status === ONLINE_ROOM_STATUS.WAITING) {
-      return "Waiting";
+      return "等待中";
     }
 
     if (room.status === ONLINE_ROOM_STATUS.ABANDONED) {
-      return "Abandoned";
+      return "已结束";
     }
 
-    if (gameState.isDraw) {
-      return "Draw";
+    if (gameState.is平局) {
+      return "平局";
     }
 
     if (gameState.winner) {
@@ -1867,26 +1874,26 @@
       return `${getRoleDisplayName(gameState.currentPlayer)} turn`;
     }
 
-    return onlineState.session.role === gameState.currentPlayer ? "Your turn" : "Opponent turn";
+    return onlineState.session.role === gameState.currentPlayer ? "轮到你了" : "对手回合";
   }
 
   function getOnlineGameStatusText() {
     const room = onlineState.room;
 
     if (!room) {
-      return "Connecting to room";
+      return "正在连接房间";
     }
 
     if (room.status === ONLINE_ROOM_STATUS.WAITING) {
-      return "Waiting for opponent";
+      return "等待对手";
     }
 
     if (room.status === ONLINE_ROOM_STATUS.ABANDONED) {
-      return "Room abandoned";
+      return "房间已结束";
     }
 
-    if (gameState.isDraw) {
-      return "Draw";
+    if (gameState.is平局) {
+      return "平局";
     }
 
     if (gameState.winner) {
@@ -1894,18 +1901,18 @@
     }
 
     if (hasThisPlayerVotedRestart()) {
-      return "Restart requested. Waiting for opponent.";
+      return "已申请重开. 等待对手.";
     }
 
     if (onlineState.pendingMove) {
-      return "Sending move";
+      return "正在落子";
     }
 
     if (isOpponentOffline()) {
-      return "Opponent offline. Waiting for reconnect.";
+      return "对手离线，等待重连。";
     }
 
-    return onlineState.session && onlineState.session.role === gameState.currentPlayer ? "Your turn" : "Opponent turn";
+    return onlineState.session && onlineState.session.role === gameState.currentPlayer ? "轮到你了" : "对手回合";
   }
 
   function isOpponentOffline() {

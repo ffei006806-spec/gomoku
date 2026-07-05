@@ -1,24 +1,45 @@
-## v3.0.9 - Mobile stone size adjustment
+# Changelog
+
+## v3.0.14
+- 首页取消单独的“加入房间”入口按钮，避免与房间号区域内的“加入房间”重复。
+- 房间号输入区默认显示，输入房间号后直接点击区域内按钮加入。
+- 版本号统一更新为 v3.0.14。
+
+## v3.0.13
+
+- 首页“在线联机”流程合并：主按钮改为“创建房间”，点击后直接创建并进入在线房间。
+- 新增首页“加入房间”按钮，仅在需要输入房间号时展开加入区域。
+- 加入区域移除重复的“创建房间”按钮，避免创建/加入入口混在一起。
+- 版本号统一更新为 v3.0.14。
+
+## v3.0.14 - Empty room delete
+
+- 点击“离开房间”时，会先移除当前玩家席位。
+- 如果对方席位为空或已离线，则立即删除整个 Firebase 房间节点。
+- 不加入定时兜底清理逻辑，避免后台自动误删仍在使用的房间。
+- 保留 v3.0.11 创建房间修复、中文按钮、手机版棋子放大、在线落子显示、虚影和版本号修复。
+
+## v3.0.14 - Mobile stone size adjustment
 
 - Enlarges stone rendering on mobile phones for better visibility and touch feedback.
 - Keeps v3.0.8 runtime version-label fix and online hover-preview behavior.
 
-## v3.0.9 - Runtime version label fix
+## v3.0.14 - Runtime version label fix
 
 - Fixes the in-game online room label that was still rendered from APP_VERSION as v3.0.0.
 - Keeps v3.0.7 hover preview behavior.
 
-## v3.0.9 - Online hover preview fix
+## v3.0.14 - Online hover preview fix
 
 - Disables hover preview stones when the online player is not allowed to move.
 - Keeps hover preview only for the active local role during online multiplayer.
-- Updates visible version labels and cache-busting query strings to v3.0.9.
+- Updates visible version labels and cache-busting query strings to v3.0.14.
 
-## v3.0.9 - Version display fix
+## v3.0.14 - Version display fix
 
-- Fixes visible page version labels and browser title to show Release v3.0.9.
+- Fixes visible page version labels and browser title to show Release v3.0.14.
 - Keeps all v3.0.5 online board render fixes.
-- Updates cache-busting query strings to v3.0.9.
+- Updates cache-busting query strings to v3.0.14.
 
 ## v3.0.5 - Online board render fix
 
@@ -46,7 +67,7 @@ All notable changes to this project will be documented in this file.
 
 This project uses local release-candidate backups before new development begins. See [docs/versioning.md](docs/versioning.md) for the versioning and backup rules.
 
-## [v3.0.9] - 2026-07-05
+## [v3.0.14] - 2026-07-05
 
 ### Added
 
@@ -57,7 +78,7 @@ This project uses local release-candidate backups before new development begins.
 
 ### Changed
 
-- Updated GitHub Pages asset references with `?v=3.0.9` cache-busting query strings.
+- Updated GitHub Pages asset references with `?v=3.0.13` cache-busting query strings.
 - Disabled undo in Online Multiplayer with an explanatory message.
 
 ## [v2.1.2] - 2026-07-04

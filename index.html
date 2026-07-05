@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>GOMOKU v3.0.9</title>
+  <title>GOMOKU v3.0.14</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-  <link rel="stylesheet" href="style.css?v=3.0.9">
+  <link rel="stylesheet" href="style.css?v=3.0.13">
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js" defer></script>
-  <script src="firebase-config.js?v=3.0.9" defer></script>
-  <script src="online-service.js?v=3.0.9" defer></script>
-  <script src="room-manager.js?v=3.0.9" defer></script>
-  <script src="online-controller.js?v=3.0.9" defer></script>
-  <script src="script.js?v=3.0.9" defer></script>
+  <script src="firebase-config.js?v=3.0.13" defer></script>
+  <script src="online-service.js?v=3.0.13" defer></script>
+  <script src="room-manager.js?v=3.0.13" defer></script>
+  <script src="online-controller.js?v=3.0.13" defer></script>
+  <script src="script.js?v=3.0.13" defer></script>
 </head>
 <body>
   <main class="app" id="app">
@@ -25,25 +25,24 @@
           </span>
           <span class="logo-word">GOMOKU</span>
         </div>
-        <p class="eyebrow">Release v3.0.9</p>
+        <p class="eyebrow">版本 v3.0.14</p>
         <h1 id="homeTitle">GOMOKU</h1>
-        <p class="home-summary">A lightweight Gomoku game with local, AI, and online two-player modes.</p>
+        <p class="home-summary">支持本地双人、AI 对战和在线联机的五子棋游戏。</p>
 
         <div class="home-actions" aria-label="首页操作">
-          <button class="primary-action large-action" id="localGameButton" type="button">Local Two Player</button>
-          <button class="primary-action large-action ai-action" id="aiGameButton" type="button">Play with AI</button>
-          <button class="primary-action large-action online-action" id="onlineGameButton" type="button">Online Multiplayer</button>
-          <button class="secondary-action large-action" id="rulesButton" type="button">Rules</button>
-          <button class="secondary-action large-action" id="aboutButton" type="button">About</button>
+          <button class="primary-action large-action" id="localGameButton" type="button">本地双人</button>
+          <button class="primary-action large-action ai-action" id="aiGameButton" type="button">人机对战</button>
+          <button class="primary-action large-action online-action" id="onlineGameButton" type="button">创建房间</button>
+          <button class="secondary-action large-action" id="rulesButton" type="button">规则说明</button>
+          <button class="secondary-action large-action" id="aboutButton" type="button">关于游戏</button>
         </div>
-        <div class="online-entry" id="onlineEntry" hidden>
+        <div class="online-entry" id="onlineEntry">
           <div class="online-room-field">
-            <label for="roomCodeInput">Room Code</label>
+            <label for="roomCodeInput">房间号</label>
             <input id="roomCodeInput" type="text" inputmode="latin" autocomplete="off" maxlength="8" placeholder="ABCDE">
           </div>
           <div class="online-entry-actions">
-            <button class="primary-action" id="createRoomButton" type="button">Create Room</button>
-            <button class="secondary-action" id="joinRoomButton" type="button">Join Room</button>
+            <button class="primary-action" id="joinRoomButton" type="button">加入房间</button>
           </div>
           <p class="online-entry-status" id="onlineHomeStatus" aria-live="polite"></p>
         </div>
@@ -62,7 +61,7 @@
 
     <section class="game-screen screen" id="gameScreen" aria-label="五子棋对局" hidden>
       <header class="game-topbar">
-        <button class="ghost-action" id="homeButton" type="button">Home</button>
+        <button class="ghost-action" id="homeButton" type="button">返回首页</button>
         <div class="brand-lockup">
           <div class="product-logo compact" aria-label="GOMOKU">
             <span class="logo-stones" aria-hidden="true">
@@ -71,7 +70,7 @@
             </span>
             <span class="logo-word">GOMOKU</span>
           </div>
-          <p class="eyebrow" id="modeLabel">Release v3.0.9</p>
+          <p class="eyebrow" id="modeLabel">版本 v3.0.14</p>
         </div>
         <button class="sound-toggle is-on" id="soundToggleButton" type="button" aria-pressed="true">声音 开</button>
       </header>
@@ -121,13 +120,13 @@
 
         <aside class="side-panel" aria-label="游戏控制">
           <div class="online-room-card" id="onlineRoomCard" hidden>
-            <p class="panel-label">Online Room</p>
+            <p class="panel-label">在线房间</p>
             <strong id="onlineRoomCode">-----</strong>
-            <p id="onlineRoomMeta">Not connected</p>
+            <p id="onlineRoomMeta">未连接</p>
             <p id="onlineOpponentStatus" aria-live="polite"></p>
             <div class="online-room-actions">
-              <button class="secondary-action" id="copyRoomCodeButton" type="button">Copy Room Code</button>
-              <button class="ghost-action" id="leaveRoomButton" type="button">Leave Room</button>
+              <button class="secondary-action" id="copyRoomCodeButton" type="button">复制房间号</button>
+              <button class="ghost-action" id="leaveRoomButton" type="button">离开房间</button>
             </div>
           </div>
 

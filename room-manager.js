@@ -1,5 +1,5 @@
 /**
- * Gomoku v3.0.9 online room manager.
+ * Gomoku v3.0.12 online room manager.
  */
 (function createGomokuRoomManager(global) {
   "use strict";
